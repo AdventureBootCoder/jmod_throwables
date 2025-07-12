@@ -435,6 +435,12 @@ if SERVER then
 				local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
 				local LaunchForce = Up * 250000 * (Specs.ForceMult or 1) * (self.CurrentPropellantPerShot / self.DefaultPropellantPerShot)
 
+				-- Calculate if projectile will be supersonic
+				local ProjectileMass = LaunchPhys:GetMass()
+				local LaunchVelocity = LaunchForce:Length() / ProjectileMass
+				local SpeedOfSound = 13500 -- 343 m/s in HU
+				local IsSupersonic = LaunchVelocity >= SpeedOfSound
+
 				-- Get server's max velocity setting and calculate overflow force
 				local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
 				local MaxForce = MaxVelocity * LaunchPhys:GetMass()
@@ -489,13 +495,77 @@ if SERVER then
 					self.HasRocketMotor = false
 				end
 
+				-- Enhanced cannon firing sound system
 				self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
+				
+				-- Main cannon firing sound - more impressive
+				local CannonFireSound = "snd_jack_c4splodeclose.ogg"
+				
+				-- Calculate sound volume based on propellant amount
+				local BaseVolume = 85
+				local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
+				local FinalVolume = math.Clamp(BaseVolume * PropellantMultiplier, 70, 120)
+				
+				-- Calculate pitch variation based on propellant
+				local BasePitch = 70
+				local PitchVariation = math.random(-10, 10)
+				local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
+				
+				-- Play the main cannon firing sound
+				self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
+				--self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume * 0.7, FinalPitch * 0.8)
+				
+				-- Add secondary explosion sound for more impact
+				--self:EmitSound("ambient/explosions/explode_1.wav", FinalVolume * 0.7, FinalPitch * 0.8)
+				
+				-- Add mechanical recoil sound
+				--self:EmitSound("physics/metal/metal_canister_impact_hard1.wav", FinalVolume * 0.5, FinalPitch * 1.2)
+				
+				-- Add cannon barrel resonance sound
+				--self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume * 0.4, FinalPitch * 0.6)
+				
+				-- Supersonic sound effects for distant players
+				if IsSupersonic then
+					-- Calculate delay based on distance and speed of sound
+					local CannonPos = self:GetPos()
+					
+					for _, Sply in player.Iterator() do
+						if IsValid(Sply) then
+							local Dist = CannonPos:Distance(Sply:GetPos())
+							local SoundDelay = Dist / SpeedOfSound
+							
+							-- Only play for players within 6000 units (reasonable hearing distance)
+							if Dist >= 1000 and Dist <= 6000 then
+								timer.Simple(SoundDelay, function()
+									if IsValid(Sply) and IsValid(self) then
+										-- Supersonic boom sound for distant players
+										local BoomVolume = math.Clamp(100 - (Dist / 20), 30, 80)
+										local BoomPitch = math.Clamp(60 - (Dist / 100), 40, 80)
+										
+										-- Calculate sound position offset towards cannon
+										local PlayerPos = Sply:GetPos()
+										local DirectionToCannon = (CannonPos - PlayerPos):GetNormalized()
+										local SoundPos = PlayerPos + DirectionToCannon * 50 -- Offset 50 units towards cannon
+										
+										-- Play supersonic boom sound
+										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, BoomVolume, BoomPitch, 1, CHAN_STATIC)
+										
+										-- Add distant cannon echo
+										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, BoomVolume * 0.6, BoomPitch * 0.9, 1, CHAN_STATIC)
+									end
+								end)
+							end
+						end
+					end
+				end
+				
 				local Poof = EffectData()
 				Poof:SetOrigin(SelfPos + Up * 85)
 				Poof:SetNormal(Up)
 				Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
 				util.Effect("eff_jack_gmod_bphmuzzle", Poof, true, true)
-				self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", 70, 80)
+				-- Minor screen shake
+				util.ScreenShake(SelfPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
 			end
 		end)
 		-- Clear the loaded projectile after launching
