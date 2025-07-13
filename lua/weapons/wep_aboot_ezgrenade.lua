@@ -67,14 +67,14 @@ if SERVER then
 		if not(ent.AlreadyPickedUp) and ent.EZinvPrime and not(ent.JModGUIcolorable) and not(ent:GetState() >= JMod.EZ_STATE_ON) then
 			local GrenadeSWEP
 			local PickedUp = true
-			if ply:HasWeapon("wep_jack_gmod_ezgrenade") then
-				GrenadeSWEP = ply:GetWeapon("wep_jack_gmod_ezgrenade")
+			if ply:HasWeapon("wep_aboot_ezgrenade") then
+				GrenadeSWEP = ply:GetWeapon("wep_aboot_ezgrenade")
 				GrenadeSWEP.GrenadeEntity = ent
 				GrenadeSWEP:StowGrenade()
 				GrenadeSWEP:GrabNewGrenade(ent)
 			else
 				-- Give the player a grenade swep
-				GrenadeSWEP = ents.Create("wep_jack_gmod_ezgrenade")
+				GrenadeSWEP = ents.Create("wep_aboot_ezgrenade")
 				GrenadeSWEP.GrenadeEntity = ent
 				GrenadeSWEP:Spawn()
 				GrenadeSWEP:Activate()
@@ -90,7 +90,7 @@ if SERVER then
 				if IsValid(ply) and IsValid(ent) and IsValid(GrenadeSWEP) then
 					ent:ForcePlayerDrop()
 					ent:Remove()
-					ply:SelectWeapon("wep_jack_gmod_ezgrenade")
+					ply:SelectWeapon("wep_aboot_ezgrenade")
 				end
 			end)
 
@@ -98,17 +98,17 @@ if SERVER then
 		end
 	end)
 	hook.Add("PlayerSwitchWeapon", "JMod_EZGrenadeDrop", function(ply, oldWeapon, newWeapon)
-		if IsValid(newWeapon) and newWeapon:GetClass() == "wep_jack_gmod_ezgrenade" then
-			if IsValid(oldWeapon) and oldWeapon:GetClass() ~= "wep_jack_gmod_ezgrenade" then
+		if IsValid(newWeapon) and newWeapon:GetClass() == "wep_aboot_ezgrenade" then
+			if IsValid(oldWeapon) and oldWeapon:GetClass() ~= "wep_aboot_ezgrenade" then
 				ply.EZoldNonGrenadeSwep = oldWeapon
 			end
 
 			return 
 		end
-		if IsValid(oldWeapon) and oldWeapon:GetClass() == "wep_jack_gmod_ezgrenade" then
+		if IsValid(oldWeapon) and oldWeapon:GetClass() == "wep_aboot_ezgrenade" then
 			oldWeapon:StowGrenade()
 			oldWeapon.EZdropper = ply
-			ply:DropNamedWeapon("wep_jack_gmod_ezgrenade")
+			ply:DropNamedWeapon("wep_aboot_ezgrenade")
 		end
 	end)
 elseif CLIENT then

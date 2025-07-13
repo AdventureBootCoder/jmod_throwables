@@ -67,13 +67,13 @@ if SERVER then
 		if not(ent.AlreadyPickedUp) and ent:GetClass() == "ent_jack_gmod_ezslam" and not(ent:GetState() >= JMod.EZ_STATE_ON) then
 			local SlamSWEP
 			local PickedUp = true
-			if ply:HasWeapon("wep_jack_gmod_ezslam") then
-				SlamSWEP = ply:GetWeapon("wep_jack_gmod_ezslam")
+			if ply:HasWeapon("wep_aboot_ezslam") then
+				SlamSWEP = ply:GetWeapon("wep_aboot_ezslam")
 				SlamSWEP:StowSlam()
 				SlamSWEP:GrabNewSlam(ent)
 			else
 				-- Give the player a SLAM swep
-				SlamSWEP = ents.Create("wep_jack_gmod_ezslam")
+				SlamSWEP = ents.Create("wep_aboot_ezslam")
 				SlamSWEP:Spawn()
 				SlamSWEP:Activate()
 				PickedUp = ply:PickupWeapon(SlamSWEP)
@@ -88,7 +88,7 @@ if SERVER then
 				if IsValid(ply) and IsValid(ent) and IsValid(SlamSWEP) then
 					ent:ForcePlayerDrop()
 					ent:Remove()
-					ply:SelectWeapon("wep_jack_gmod_ezslam")
+					ply:SelectWeapon("wep_aboot_ezslam")
 				end
 			end)
 
@@ -96,11 +96,11 @@ if SERVER then
 		end
 	end)
 	hook.Add("PlayerSwitchWeapon", "JMod_EZslamDrop", function(ply, oldWeapon, newWeapon)
-		if IsValid(newWeapon) and newWeapon:GetClass() == "wep_jack_gmod_ezslam" then return end
-		if IsValid(oldWeapon) and oldWeapon:GetClass() == "wep_jack_gmod_ezslam" then
+		if IsValid(newWeapon) and newWeapon:GetClass() == "wep_aboot_ezslam" then return end
+		if IsValid(oldWeapon) and oldWeapon:GetClass() == "wep_aboot_ezslam" then
 			oldWeapon:StowSlam()
 			oldWeapon.EZdropper = ply
-			ply:DropNamedWeapon("wep_jack_gmod_ezslam")
+			ply:DropNamedWeapon("wep_aboot_ezslam")
 		end
 	end)
 end
