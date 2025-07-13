@@ -69,6 +69,9 @@ ENT.ProjectileSpecs = {
 	["ent_aboot_ezcannon_shot_cannister"] = {
 		ArmDelay = .05
 	},
+	["ent_aboot_ezcannon_shot_angler"] = {
+		ArmDelay = .1
+	},
 	["ent_jack_gmod_ezcriticalityweapon"] = {
 		ArmDelay = 3,
 		ArmMethod = "Detonate",
@@ -564,6 +567,22 @@ if SERVER then
 				Poof:SetNormal(Up)
 				Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
 				util.Effect("eff_jack_gmod_bphmuzzle", Poof, true, true)
+				
+				-- Create explosion in front of cannon if propellant > 50
+				if self.CurrentPropellantPerShot > 50 then
+					-- Position explosion far enough away to not damage the cannon (150 units forward)
+					local ExplosionPos = SelfPos + Up * 200
+					
+					-- Calculate explosion power based on propellant amount
+					local ExplosionPower = 10 * (self.CurrentPropellantPerShot / 100)
+					
+					-- Create actual damaging explosion using JMod.Sploom
+					JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
+					
+					-- Add explosion sound
+					--self:EmitSound("ambient/explosions/explode_1.wav", FinalVolume * 0.8, FinalPitch * 0.9)
+				end
+				
 				-- Minor screen shake
 				util.ScreenShake(SelfPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
 			end
