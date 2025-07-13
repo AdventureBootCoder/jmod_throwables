@@ -56,6 +56,13 @@ if SERVER then
 		local pos = self:GetPos()
 		local backPos = pos - vel:GetNormalized() * 20
 		sound.Play("ambient/energy/zap" .. math.random(1, 3) .. ".wav", pos, 75, math.Rand(90, 110))
+
+		-- Electrical Arc effects
+		local ElectricEffect = EffectData()
+		ElectricEffect:SetEntity(self)
+		ElectricEffect:SetScale(1)
+		ElectricEffect:SetRadius(200)
+		util.Effect("aboot_tesla_arc", ElectricEffect, true)
 		
 		-- Additional spark effects
 		local SparkEffect = EffectData()
@@ -74,6 +81,22 @@ if SERVER then
 		local Attacker = JMod.GetEZowner(self)
 		local Pos = self:GetPos() + Vector(0, 0, 10)
 		
+		local PlasmaDamageCache = self.PlasmaDamage
+		local PlasmaRadiusCache = self.PlasmaRadius
+		timer.Simple(.1, function()
+			local MeltBlast = DamageInfo()
+			MeltBlast:SetInflictor(game.GetWorld())
+			MeltBlast:SetAttacker(game.GetWorld())
+			MeltBlast:SetDamage(PlasmaDamageCache)
+			MeltBlast:SetDamageType(DMG_DISSOLVE + DMG_PLASMA)
+			util.BlastDamageInfo(MeltBlast, Pos, PlasmaRadiusCache)
+			for k, v in pairs(ents.FindInSphere(Pos, PlasmaRadiusCache)) do 
+				if v:GetClass() == "npc_strider" then
+					v:Fire("break")
+				end
+			end
+		end)
+
 		self.Sploomd = true
 		local Blam = EffectData()
 		Blam:SetOrigin(Pos)
@@ -85,32 +108,6 @@ if SERVER then
 			sound.Play("BaseExplosionEffect.Sound", Pos, 120, math.random(90, 110))
 		end
 
-		for i = 1, 2 do
-			sound.Play("ambient/explosions/explode_" .. math.random(1, 9) .. ".wav", Pos + VectorRand() * 1000, 140, math.random(90, 110))
-		end
-
-		local PlasmaDamageCache = self.PlasmaDamage
-		local PlasmaRadiusCache = self.PlasmaRadius
-		timer.Simple(.1, function()
-			local MeltBlast = DamageInfo()
-			MeltBlast:SetInflictor(game.GetWorld())
-			MeltBlast:SetAttacker(game.GetWorld())
-			MeltBlast:SetDamage(PlasmaDamageCache)
-			MeltBlast:SetDamageType(DMG_DISSOLVE)
-			util.BlastDamageInfo(MeltBlast, Pos, PlasmaRadiusCache)
-			for k, v in pairs(ents.FindInSphere(Pos, PlasmaRadiusCache)) do 
-				if v:GetClass() == "npc_strider" then
-					v:Fire("break")
-				end
-			end
-		end)
-		
-		-- Additional plasma visual effect
-		local PlasmaEffect = EffectData()
-		PlasmaEffect:SetOrigin(Pos)
-		PlasmaEffect:SetScale(1.5)
-		util.Effect("electrical_arc_01", PlasmaEffect, true, true)
-		
 		-- Plasma sound
 		self:EmitSound("ambient/energy/zap" .. math.random(1, 3) .. ".wav", 85, math.Rand(90, 110))
 		
@@ -142,7 +139,7 @@ elseif CLIENT then
 			render.SetMaterial(glowmat)
 			render.DrawSprite(pos, size, size, Color(255, 0, 242, 100))
 
-			for i = 1, 5 do
+			--[[for i = 1, 5 do
 				local trace = util.TraceLine({
 					start = pos,
 					endpos = pos + VectorRand() * self.EffectRadius,
@@ -155,7 +152,7 @@ elseif CLIENT then
 				render.AddBeam(Halfway + VectorRand() * self.EffectRadius * 0.25, 10, .5, Color(100, 150, 255))
 				render.AddBeam(trace.HitPos, 10, 1, Color(100, 150, 255))
 				render.EndBeam()
-			end
+			end--]]
 		end
 	end
 end 

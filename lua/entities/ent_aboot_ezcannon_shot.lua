@@ -63,11 +63,13 @@ if SERVER then
 	function ENT:Detonate()
 		-- Do some shrapnel
 		local Attacker = JMod.GetEZowner(self)
-		JMod.Sploom(Attacker, self:GetPos(), 50, 100)
-		JMod.FragSplosion(self, self:GetPos() + Vector(0, 0, 10), 1000, 100, 300, Attacker, nil, nil, nil, true)
+		local Pos = self:GetPos()
+		JMod.Sploom(Attacker, Pos, 50, 100)
+		JMod.FragSplosion(self, Pos + Vector(0, 0, 10), 1000, 100, 300, Attacker, nil, nil, nil, true)
+		JMod.WreckBuildings(self, Pos, 2.5, 1, true)
 		-- Do some effects
 		local Effect = EffectData()
-		Effect:SetOrigin(self:GetPos())
+		Effect:SetOrigin(Pos)
 		Effect:SetScale(3)
 		Effect:SetNormal(Vector(0, 0, 1))
 		util.Effect("eff_jack_gmod_bpsmoke", Effect, true, true)

@@ -62,8 +62,9 @@ if SERVER then
 		local Pos = self:GetPos() + Vector(0, 0, 10)
 		local Vel = self:GetVelocity()
 		local Direction = Vel:GetNormalized()
+		local VelocityModifier = Vel:Length() / 2000
 		
-		JMod.FragSplosion(Attacker, Pos, self.ShardCount, self.ShardDamage, self.ShardSpeed, Attacker, Direction, .25, 5, true)
+		JMod.FragSplosion(Attacker, Pos, self.ShardCount, self.ShardDamage, self.ShardSpeed * VelocityModifier, Attacker, Direction, .25, 5, true)
 		
 		-- Minimal explosion effect
 		local Effect = EffectData()
