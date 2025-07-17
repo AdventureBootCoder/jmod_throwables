@@ -16,10 +16,14 @@ ENT.EZcolorable = false
 ENT.EZlowFragPlease = true
 ENT.EZbuoyancy = .3
 ENT.JModHighlyFlammableFunc = "LaunchProjectile"
+ENT.Mass = 300
+ENT.Model = "models/props_phx/misc/smallcannon.mdl"
 ---
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
 	JMod.EZ_RESOURCE_TYPES.PROPELLANT,
+	JMod.EZ_RESOURCE_TYPES.CHEMICALS,
+	JMod.EZ_RESOURCE_TYPES.PAPER,
 	JMod.EZ_RESOURCE_TYPES.STEEL,
 	JMod.EZ_RESOURCE_TYPES.LEAD,
 	JMod.EZ_RESOURCE_TYPES.TITANIUM,
@@ -28,6 +32,10 @@ ENT.EZconsumes = {
 }
 
 ENT.DefaultPropellantPerShot = 20
+ENT.MaxPropellant = 200
+ENT.NextRefillTime = 0
+ENT.BarrelLength = 30
+ENT.PropellantForce = 10000
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
@@ -54,7 +62,10 @@ ENT.ProjectileSpecs = {
 	["ent_jack_gmod_ezfumigator"] = {
 		ArmDelay = .5,
 		ArmMethod = "Fume",
-		SpecialCorrection = true
+		RightCorrection = -90
+	},
+	["ent_jack_gmod_ezflareprojectile"] = {
+		ForceMult = .1
 	},
 	["ent_jack_gmod_eznuke_small"] = {	
 		ArmDelay = 1
@@ -70,7 +81,8 @@ ENT.ProjectileSpecs = {
 		ArmDelay = .05
 	},
 	["ent_aboot_ezcannon_shot_angler"] = {
-		ArmDelay = .1
+		ArmDelay = .1,
+		Angles = Angle(0, 90, 0)
 	},
 	["ent_jack_gmod_ezcriticalityweapon"] = {
 		ArmDelay = 3,
@@ -85,7 +97,7 @@ ENT.ProjectileSpecs = {
 
 if SERVER then
 	function ENT:SpawnFunction(ply, tr)
-		local SpawnPos = tr.HitPos + tr.HitNormal * 40
+		local SpawnPos = tr.HitPos + tr.HitNormal * 20
 		local ent = ents.Create(self.ClassName)
 		ent:SetAngles(self.JModPreferredCarryAngles or Angle(0, 0, 0) + Angle(0, ply:GetAngles().y, 0))
 		ent:SetPos(SpawnPos)
@@ -100,7 +112,7 @@ if SERVER then
 	end
 
 	function ENT:Initialize()
-		self:SetModel("models/props_phx/misc/smallcannon.mdl")
+		self:SetModel(self.Model)
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
@@ -110,7 +122,7 @@ if SERVER then
 		local phys = self:GetPhysicsObject()
 		timer.Simple(.01, function()
 			if IsValid(phys) then
-				phys:SetMass(300)
+				phys:SetMass(self.Mass)
 				phys:Wake()
 				phys:EnableDrag(false)
 				phys:SetBuoyancyRatio(self.EZbuoyancy)
@@ -118,9 +130,7 @@ if SERVER then
 		end)
 		self.LoadedProjectileType = self.LoadedProjectileType
 		self.Propellant = self.Propellant or 0
-		self.MaxPropellant = 100
 		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
-		self.NextRefillTime = 0
 		---
 		if istable(WireLib) then
 			self.Inputs = WireLib.CreateInputs(self, {"Launch [NORMAL]", "Unload [NORMAL]", "PropellantPerShot [NORMAL]"}, {"Fires the loaded Projectile", "Unloads Projectile", "Sets the amount of propellant used per shot (1-100)"})
@@ -150,8 +160,8 @@ if SERVER then
 		net.WriteEntity(self)
 		net.WriteString("state_sync")
 		net.WriteString(self.LoadedProjectileType or "")
-		net.WriteInt(self.Propellant or 0, 8)
-		net.WriteInt(self.CurrentPropellantPerShot or 20, 8)
+		net.WriteUInt(self.Propellant or 0, 8)
+		net.WriteUInt(self.CurrentPropellantPerShot or 20, 8)
 		net.Broadcast()
 	end
 	
@@ -249,9 +259,19 @@ if SERVER then
 			-- Check for antimatter loading and set plasma projectile
 			if typ == JMod.EZ_RESOURCE_TYPES.ANTIMATTER and amt >= 10 then
 				self:SetProjectileType("ent_aboot_ezcannon_shot_plasma")
+
 				return 10
 			elseif typ == JMod.EZ_RESOURCE_TYPES.LEAD and amt >= 20 then
 				self:SetProjectileType("ent_aboot_ezcannon_shot_cannister")
+
+				return 20
+			elseif typ == JMod.EZ_RESOURCE_TYPES.TITANIUM and amt >= 10 then
+				self:SetProjectileType("ent_aboot_ezcannon_shot_angler")
+
+				return 10
+			elseif typ == JMod.EZ_RESOURCE_TYPES.PAPER and amt >= 20 then
+				self:SetProjectileType("ent_jack_gmod_ezflareprojectile")
+
 				return 20
 			end
 		end
@@ -333,7 +353,7 @@ if SERVER then
 		local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
 
 		-- Create the projectile entity
-		local LaunchedProjectile = ents.Create(self.LoadedProjectileType)
+		local LaunchedProjectile = ents.Create(Specs.ReplaceEnt or self.LoadedProjectileType)
 		LaunchedProjectile:SetPos(SelfPos)
 		-- Special handling for prop_physics
 		if Specs.UsePropModel then
@@ -353,15 +373,12 @@ if SERVER then
 				LaunchAngle:RotateAroundAxis(LaunchAngle:Up(), 90)
 			end
 		else
-			-- Handle regular projectiles
-			if Specs.SpecialCorrection then
-				--
-			else
-				LaunchAngle:RotateAroundAxis(LaunchAngle:Right(), 90)
-			end
+			LaunchAngle:RotateAroundAxis(LaunchAngle:Right(), 90 + (Specs.RightCorrection or 0))
 
 			if Specs.Angles then
-				--
+				LaunchAngle:RotateAroundAxis(LaunchAngle:Right(), Specs.Angles.p)
+				LaunchAngle:RotateAroundAxis(LaunchAngle:Up(), Specs.Angles.y)
+				LaunchAngle:RotateAroundAxis(LaunchAngle:Forward(), Specs.Angles.r)
 			elseif LaunchedProjectile.JModPreferredCarryAngles then
 				LaunchAngle:RotateAroundAxis(LaunchAngle:Right(), -LaunchedProjectile.JModPreferredCarryAngles.p)
 				LaunchAngle:RotateAroundAxis(LaunchAngle:Up(), LaunchedProjectile.JModPreferredCarryAngles.y)
@@ -383,7 +400,7 @@ if SERVER then
 		local CenterOffset = CannonCenter - ProjectileCenter
 		
 		-- Apply the center alignment offset plus the launch offset
-		local LaunchPos = SelfPos + CenterOffset + Up * 30
+		local LaunchPos = SelfPos + CenterOffset + Up * self.BarrelLength
 		
 		-- Apply special offset if specified
 		if Specs.Offset then
@@ -394,7 +411,7 @@ if SERVER then
 		LaunchedProjectile:SetPos(LaunchPos)
 		local Nocollider = constraint.NoCollide(self, LaunchedProjectile, 0, 0, true)
 	
-		timer.Simple(0, function()
+		timer.Simple(0.1, function()
 			if not IsValid(LaunchedProjectile) or not IsValid(self) then return end
 			LaunchedProjectile:GetPhysicsObject():SetVelocity(self:GetPhysicsObject():GetVelocity())
 
@@ -436,7 +453,7 @@ if SERVER then
 					return 
 				end
 				local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
-				local LaunchForce = Up * 250000 * (Specs.ForceMult or 1) * (self.CurrentPropellantPerShot / self.DefaultPropellantPerShot)
+				local LaunchForce = Up * self.PropellantForce * self.CurrentPropellantPerShot * (Specs.ForceMult or 1)
 
 				-- Calculate if projectile will be supersonic
 				local ProjectileMass = LaunchPhys:GetMass()
@@ -652,8 +669,8 @@ if SERVER then
 			net.WriteEntity(self)
 			net.WriteString("open")
 			net.WriteString(self.LoadedProjectileType or "")
-			net.WriteInt(self.Propellant, 8)
-			net.WriteInt(self.CurrentPropellantPerShot, 8)
+			net.WriteUInt(self.Propellant, 8)
+			net.WriteUInt(self.CurrentPropellantPerShot, 8)
 			net.Send(activator)
 		else
 			self:LaunchProjectile(false, activator)
@@ -709,8 +726,8 @@ if SERVER then
 					net.WriteEntity(cannon)
 					net.WriteString("open")
 					net.WriteString(cannon.LoadedProjectileType or "")
-					net.WriteInt(cannon.Propellant or 0, 8)
-					net.WriteInt(cannon.CurrentPropellantPerShot or 20, 8)
+					net.WriteUInt(cannon.Propellant or 0, 8)
+					net.WriteUInt(cannon.CurrentPropellantPerShot or 20, 8)
 				net.Send(ply)
 			end
 		elseif command == "fire" then
@@ -729,8 +746,8 @@ if SERVER then
 			end
 		elseif command == "state_sync" then
 			cannon.LoadedProjectileType = net.ReadString()
-			cannon.Propellant = net.ReadInt(8)
-			cannon.CurrentPropellantPerShot = net.ReadInt(8)
+			cannon.Propellant = net.ReadUInt(8)
+			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 			cannon:UpdateWireOutputs()
 		end
 	end)
@@ -741,7 +758,7 @@ elseif CLIENT then
 		self.LoadedProjectileType = nil
 		self.Propellant = 0
 		self.PropModel = nil
-		self.CurrentPropellantPerShot = self.DefaultPropellantPerShot
+		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
 		
 		-- Custom model initialization
 		self:DrawShadow(true)
@@ -753,6 +770,10 @@ elseif CLIENT then
 		self.BreechSlide = 0
 		self.HatchTargetAngle = 0
 		self.BreechTargetSlide = 0
+
+		-- To stop the breech and hatch from disappearing
+		local mins, maxs = self:GetRenderBounds()
+		self:SetRenderBounds(mins + Vector(-22, 0, 0), maxs + Vector(22, 0, 0))
 	end
 
 	function ENT:Think()
@@ -823,8 +844,8 @@ elseif CLIENT then
 		
 		if command == "open" then
 			cannon.LoadedProjectileType = net.ReadString()
-			cannon.Propellant = net.ReadInt(8)
-			cannon.CurrentPropellantPerShot = net.ReadInt(8)
+			cannon.Propellant = net.ReadUInt(8)
+			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 
 			if IsValid(cannon) then
 				JMod_EZCannon_OpenGUI(cannon)
@@ -832,8 +853,8 @@ elseif CLIENT then
 		elseif command == "state_sync" then
 			if IsValid(cannon) then
 				cannon.LoadedProjectileType = net.ReadString()
-				cannon.Propellant = net.ReadInt(8)
-				cannon.CurrentPropellantPerShot = net.ReadInt(8)
+				cannon.Propellant = net.ReadUInt(8)
+				cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 			end
 		end
 	end)
@@ -879,7 +900,7 @@ elseif CLIENT then
 		infoLabel:SetSize(360, 60)
 		infoLabel:SetText("Cannon Status:\n" .. 
 			"Loaded: " .. (cannon.LoadedProjectileType or "None") .. "\n" ..
-			"Propellant: " .. (cannon.Propellant or 0) .. "/100")
+			"Propellant: " .. (cannon.Propellant or 0) .. "/" .. (cannon.MaxPropellant or 100))
 		infoLabel:SetWrap(true)
 		infoLabel:SetTextColor(Color(255, 255, 255, 200))
 		
