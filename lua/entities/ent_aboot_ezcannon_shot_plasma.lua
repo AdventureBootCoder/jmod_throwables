@@ -23,7 +23,7 @@ ENT.FuseTime = 3
 ENT.TrailEffectScale = 2
 ENT.TrailSoundVolume = 45
 ENT.PlasmaRadius = 250
-ENT.PlasmaDamage = 2000
+ENT.PlasmaDamage = 1000
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 0, "IsArmed")
