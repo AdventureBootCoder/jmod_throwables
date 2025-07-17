@@ -61,16 +61,23 @@ SWEP.WElements = {
 	}
 }
 
+local Wepify = CreateConVar("jmod_ezgrenade_wepify", "0", FCVAR_ARCHIVE, "Wepify the grenades")
+
 if SERVER then
 	util.AddNetworkString("JMod_EZGrenadeData")
 	hook.Add("OnPlayerPhysicsPickup", "JMod_EZGrenadePickup", function(ply, ent)
-		if not(ent.AlreadyPickedUp) and ent.EZinvPrime and not(ent.JModGUIcolorable) and not(ent:GetState() >= JMod.EZ_STATE_ON) then
+		if not Wepify:GetBool() then return end
+		if not(IsValid(ent:GetParent())) and ent.EZinvPrime and not(ent.JModGUIcolorable) and not(ent:GetState() >= JMod.EZ_STATE_ON) then
 			local GrenadeSWEP
 			local PickedUp = true
 			if ply:HasWeapon("wep_aboot_ezgrenade") then
 				GrenadeSWEP = ply:GetWeapon("wep_aboot_ezgrenade")
-				GrenadeSWEP.GrenadeEntity = ent
-				GrenadeSWEP:StowGrenade()
+				-- Store the old grenade before setting the new one
+				local OldGrenade = GrenadeSWEP.GrenadeEntity
+				-- Stow the old grenade if it exists
+				if IsValid(OldGrenade) then
+					GrenadeSWEP:StowGrenade()
+				end
 				GrenadeSWEP:GrabNewGrenade(ent)
 			else
 				-- Give the player a grenade swep
@@ -81,15 +88,14 @@ if SERVER then
 				PickedUp = ply:PickupWeapon(GrenadeSWEP)
 			end
 			ent:SetOwner(ply)
-			ent.AlreadyPickedUp = PickedUp
-			ent:SetNoDraw(true)
-			ent:SetNotSolid(true)
 
 			timer.Simple(0, function()
-				if not PickedUp then GrenadeSWEP:Remove() return end
+				if not PickedUp then 
+					if IsValid(GrenadeSWEP) then GrenadeSWEP:Remove() end
+					return 
+				end
 				if IsValid(ply) and IsValid(ent) and IsValid(GrenadeSWEP) then
 					ent:ForcePlayerDrop()
-					ent:Remove()
 					ply:SelectWeapon("wep_aboot_ezgrenade")
 				end
 			end)
@@ -226,6 +232,20 @@ function SWEP:GrabNewGrenade(entity)
 	self.ReadyToThrow = false
 	self.ReadyToLob = false
 	self.FinishThrowTime = 0
+	
+	-- Set a safe position before parenting to prevent coordinate issues
+	entity:SetPos(self:GetPos() + Vector(0, 0, 10))
+	entity:SetParent(self)
+	entity:SetNoDraw(true)
+	entity:SetNotSolid(true)
+	
+	-- Hide the grenade after a second
+	timer.Simple(.1, function()
+		if IsValid(entity) and entity:GetParent() == self then
+			entity:SetNoDraw(true)
+		end
+	end)
+	
 	self.GrenadeEntity = entity
 	self:SetupGrenadeInfo(entity)
 end
@@ -236,20 +256,22 @@ function SWEP:StowGrenade()
 	if not(IsValid(Owner)) and IsValid(self.EZdropper) then Owner = self.EZdropper end
 	if not IsValid(Owner) then return end
 	if self:GetGrenadeType() == "" then return end
-	local Grenade = ents.Create(self:GetGrenadeType())
-	Grenade:SetPos(util.QuickTrace(Owner:GetShootPos(), Owner:GetAimVector() * 60, {Owner, Grenade}).HitPos)
-	Grenade:Spawn()
-	Grenade:Activate()
-
-	if IsValid(self.GrenadeEntity) then
-		self.GrenadeEntity:Remove()
-	end
-	self.GrenadeEntity = Grenade
-
-	local Successful = JMod.AddToInventory(Owner, Grenade)
-
-	if not Successful then
-		--
+	
+	-- Use the original grenade entity instead of creating a new one
+	local Grenade = self.GrenadeEntity
+	if IsValid(Grenade) then
+		-- Unparent and restore the grenade
+		Grenade:SetParent(nil)
+		Grenade:SetNoDraw(false)
+		Grenade:SetNotSolid(false)
+		
+		-- Set position for inventory
+		Grenade:SetPos(util.QuickTrace(Owner:GetShootPos(), Owner:GetAimVector() * 60, {Owner, Grenade}).HitPos)
+		
+		local Successful = JMod.AddToInventory(Owner, Grenade)
+		
+		-- Clear the reference
+		self.GrenadeEntity = nil
 	end
 end
 
@@ -288,39 +310,40 @@ function SWEP:Deploy()
 	return true
 end
 
---[[local GrenadeTypes = {
-	"ent_jack_gmod_ezgrenade",
-	"ent_jack_gmod_ezfragnade",
-	"ent_jack_gmod_ezfirenade",
-	"ent_jack_gmod_ezflashbang",
-	"ent_jack_gmod_ezgasnade",
-	"ent_jack_gmod_ezsmokenade",
-	"ent_jack_gmod_ezsignalnade",
-	"ent_jack_gmod_ezsticknade",
-	"ent_jack_gmod_ezsticknadebundle",
-	"ent_jack_gmod_ezstickynade"
-}--]]
-
 function SWEP:CreateGrenade()
 	if not IsFirstTimePredicted() then return NULL end
 	local GrenadeType = self:GetGrenadeType() --table.Random(GrenadeTypes)
 	if GrenadeType == "" then return NULL end
 	local Owner = (IsValid(self:GetOwner()) and self:GetOwner()) or self.EZdropper
-	local Grenade = ents.Create(GrenadeType)
-	Grenade:SetPos(Owner:GetPos())
-	JMod.SetEZowner(Grenade, Owner)
-	Grenade:SetOwner(Owner)
-	Grenade:Spawn()
-	Grenade:Activate()
-	Grenade:SetColor(self.GrenadeTypeInfo.Color)
-
-	timer.Simple(0.1, function()
-		if IsValid(Grenade) then
-			Grenade:SetOwner(nil)
-		end
-	end)
-
-	return Grenade
+	
+	-- Use the original grenade entity instead of creating a new one
+	local Grenade = self.GrenadeEntity
+	if IsValid(Grenade) then
+		-- Unparent and restore the grenade
+		Grenade:SetParent(nil)
+		Grenade:SetNoDraw(false)
+		Grenade:SetNotSolid(false)
+		
+		-- Set a safe position relative to the owner
+		local safePos = Owner:GetPos() + Vector(0, 0, 10)
+		Grenade:SetPos(safePos)
+		
+		JMod.SetEZowner(Grenade, Owner)
+		Grenade:SetOwner(Owner)
+		
+		-- Clear the reference since we're using it
+		self.GrenadeEntity = nil
+		
+		timer.Simple(0.1, function()
+			if IsValid(Grenade) then
+				Grenade:SetOwner(nil)
+			end
+		end)
+		
+		return Grenade
+	end
+	
+	return NULL
 end
 
 function SWEP:Throw(hardThrow)
@@ -339,7 +362,7 @@ function SWEP:Throw(hardThrow)
 		if Bone then
 			ThrowPos = Owner:GetBonePosition(Bone) + AimVec * 50
 		end
-		local ThrowTr = util.QuickTrace(ShootPos, (ThrowPos - ShootPos)*.5, {Owner, Grneade})
+		local ThrowTr = util.QuickTrace(ShootPos, (ThrowPos - ShootPos)*.5, {Owner, Grenade})
 
 		if ThrowTr.Hit then
 			Grenade:SetPos(ThrowTr.HitPos + ThrowTr.HitNormal * 5)
@@ -459,27 +482,15 @@ end
 
 function SWEP:OnDrop()
 	if not IsFirstTimePredicted() then return end
-	--[[if IsValid(self.EZdropper) and self.EZdropper:IsPlayer() then
-		local AimPos, AimVec = self.EZdropper:GetShootPos(), self.EZdropper:GetAimVector()
-		local PlaceTr = util.QuickTrace(AimPos, AimVec * 60, {self, self.EZdropper})
-		Pos = PlaceTr.HitPos + PlaceTr.HitNormal * 5
-	end
-
-	local Grenade = ents.Create(self:GetGrenadeType())
-	Grenade:SetPos(self:GetPos())
-	Grenade:SetAngles(self:GetAngles())
-	Grenade:Spawn()
-	Grenade:Activate()
-	local Phys = Grenade:GetPhysicsObject()
-
-	if Phys then
-		Phys:SetVelocity(self:GetPhysicsObject():GetVelocity() / 2)
-	end--]]
-
 	local Ply = self.EZdropper
 	if self.Dropped then
-		local Grenade = self:CreateGrenade()
+		-- Use the original grenade entity if available
+		local Grenade = self.GrenadeEntity
 		if IsValid(Grenade) then
+			-- Unparent and restore the grenade
+			Grenade:SetParent(nil)
+			Grenade:SetNoDraw(false)
+			Grenade:SetNotSolid(false)
 			Grenade:SetPos(util.QuickTrace(Ply:GetShootPos(), Ply:GetAimVector() * 50, {Ply, Grenade}).HitPos)
 		end
 	end
@@ -498,6 +509,14 @@ function SWEP:OnDrop()
 end
 
 function SWEP:Think()
+	-- Check if the grenade entity is still valid, remove weapon if not
+	if SERVER and not IsValid(self.GrenadeEntity) then
+		if IsValid(self.Owner) and self.Owner:IsPlayer() then
+			self.Owner:DropWeapon(self)
+		end
+		return
+	end
+
 	local Time = CurTime()
 	local Owner = self:GetOwner()
 	local vm = Owner:GetViewModel()
@@ -551,9 +570,9 @@ function SWEP:Think()
 				local Nade = tbl.ent
 		
 				if IsValid(Nade) and Nade.EZinvPrime then
-					self.GrenadeEntity = Nade
+					-- Remove the grenade from the inventory
+					Nade = JMod.RemoveFromInventory(Owner, Nade, nil, false, true)
 					self:GrabNewGrenade(Nade)
-					local Nade = JMod.RemoveFromInventory(ply, Nade, nil, false, false)
 					FoundGrenade = true
 
 					local vm = Owner:GetViewModel()
@@ -576,6 +595,25 @@ end
 
 function SWEP:OnRemove()
 	self:SCKHolster()
+
+	-- Clean up the parented grenade entity
+	if IsValid(self.GrenadeEntity) then
+		self.GrenadeEntity:SetParent(nil)
+		self.GrenadeEntity:SetNoDraw(false)
+		self.GrenadeEntity:SetNotSolid(false)
+		self.GrenadeEntity:SetPos(self:GetPos() + Vector(0, 0, 10))
+		
+		-- If the player who was holding it is dead, prime the grenade
+		local Owner = JMod.GetEZowner(self.GrenadeEntity)
+		print("Deadman's trigger: "..tostring(Owner))
+		if IsValid(Owner) and Owner:IsPlayer() and not Owner:Alive() then
+			if self.GrenadeEntity.Prime then
+				self.GrenadeEntity:Prime(Owner)
+			end
+		end
+		
+		-- Don't remove it, let it fall to the ground or be handled by other systems
+	end
 
 	if IsValid(self.Owner) and CLIENT and self.Owner:IsPlayer() then
 		local vm = self.Owner:GetViewModel()

@@ -62,32 +62,40 @@ SWEP.WElements = {
 	}--]]
 }
 
+local Wepify = CreateConVar("jmod_ezslam_wepify", "0", FCVAR_ARCHIVE, "Wepify the slams")
+
 if SERVER then
 	hook.Add("OnPlayerPhysicsPickup", "JMod_EZslamPickup", function(ply, ent)
-		if not(ent.AlreadyPickedUp) and ent:GetClass() == "ent_jack_gmod_ezslam" and not(ent:GetState() >= JMod.EZ_STATE_ON) then
+		if not Wepify:GetBool() then return end
+		if not(IsValid(ent:GetParent())) and ent:GetClass() == "ent_jack_gmod_ezslam" and not(ent:GetState() >= JMod.EZ_STATE_ON) then
 			local SlamSWEP
 			local PickedUp = true
 			if ply:HasWeapon("wep_aboot_ezslam") then
 				SlamSWEP = ply:GetWeapon("wep_aboot_ezslam")
-				SlamSWEP:StowSlam()
+				-- Store the old SLAM before setting the new one
+				local OldSlam = SlamSWEP.SlamEntity
+				-- Stow the old SLAM if it exists
+				if IsValid(OldSlam) then
+					SlamSWEP:StowSlam()
+				end
 				SlamSWEP:GrabNewSlam(ent)
 			else
 				-- Give the player a SLAM swep
 				SlamSWEP = ents.Create("wep_aboot_ezslam")
+				SlamSWEP.SlamEntity = ent
 				SlamSWEP:Spawn()
 				SlamSWEP:Activate()
 				PickedUp = ply:PickupWeapon(SlamSWEP)
 			end
 			ent:SetOwner(ply)
-			ent.AlreadyPickedUp = PickedUp
-			ent:SetNoDraw(true)
-			ent:SetNotSolid(true)
 
 			timer.Simple(0, function()
-				if not PickedUp then SlamSWEP:Remove() return end
+				if not PickedUp then 
+					if IsValid(SlamSWEP) then SlamSWEP:Remove() end
+					return 
+				end
 				if IsValid(ply) and IsValid(ent) and IsValid(SlamSWEP) then
 					ent:ForcePlayerDrop()
-					ent:Remove()
 					ply:SelectWeapon("wep_aboot_ezslam")
 				end
 			end)
@@ -108,6 +116,20 @@ end
 function SWEP:GrabNewSlam(entity)
 	self.NextIdle = self.NextIdle or 0
 	self.FinishThrowTime = 0
+	
+	-- Set a safe position before parenting to prevent coordinate issues
+	entity:SetPos(self:GetPos() + Vector(0, 0, 10))
+	entity:SetParent(self)
+	entity:SetNoDraw(true)
+	entity:SetNotSolid(true)
+	
+	-- Hide the SLAM after a second
+	timer.Simple(.1, function()
+		if IsValid(entity) and entity:GetParent() == self then
+			entity:SetNoDraw(true)
+		end
+	end)
+	
 	self.SlamEntity = entity
 end
 
@@ -116,15 +138,27 @@ function SWEP:StowSlam()
 	local Owner = self.Owner
 	if not(IsValid(Owner)) and IsValid(self.EZdropper) then Owner = self.EZdropper end
 	if not IsValid(Owner) then return end
-	local Slam = ents.Create("ent_jack_gmod_ezslam")
-	Slam:SetPos(util.QuickTrace(Owner:GetShootPos(), Owner:GetAimVector() * 60, {Owner, Slam}).HitPos)
-	Slam:Spawn()
-	Slam:Activate()
-
-	local Successful = JMod.AddToInventory(Owner, Slam)
-
-	if not Successful then
-		--
+	
+	-- Use the original SLAM entity instead of creating a new one
+	local Slam = self.SlamEntity
+	if IsValid(Slam) then
+		-- Unparent and restore the SLAM
+		Slam:SetParent(nil)
+		Slam:SetNoDraw(false)
+		Slam:SetNotSolid(false)
+		
+		-- Set position for inventory
+		Slam:SetPos(util.QuickTrace(Owner:GetShootPos(), Owner:GetAimVector() * 60, {Owner, Slam}).HitPos)
+		
+		local Successful = JMod.AddToInventory(Owner, Slam)
+		
+		if not Successful then
+			-- If inventory is full, drop the SLAM
+			Slam:SetPos(Owner:GetPos() + Vector(0, 0, 10))
+		end
+		
+		-- Clear the reference
+		self.SlamEntity = nil
 	end
 end
 
@@ -160,15 +194,36 @@ end
 
 function SWEP:CreateSlam()
 	if not IsFirstTimePredicted() then return NULL end
-	local Owner = self:GetOwner()
-	local Slam = ents.Create("ent_jack_gmod_ezslam")
-	Slam:SetPos(Owner:GetPos())
-	Slam:SetOwner(Owner)
-	Slam:Spawn()
-	Slam:Activate()
-	JMod.SetEZowner(Slam, Owner, true)
-
-	return Slam
+	local Owner = (IsValid(self:GetOwner()) and self:GetOwner()) or self.EZdropper
+	
+	-- Use the original SLAM entity instead of creating a new one
+	local Slam = self.SlamEntity
+	if IsValid(Slam) then
+		-- Unparent and restore the SLAM
+		Slam:SetParent(nil)
+		Slam:SetNoDraw(false)
+		Slam:SetNotSolid(false)
+		
+		-- Set a safe position relative to the owner
+		local safePos = Owner:GetPos() + Vector(0, 0, 10)
+		Slam:SetPos(safePos)
+		
+		JMod.SetEZowner(Slam, Owner)
+		Slam:SetOwner(Owner)
+		
+		-- Clear the reference since we're using it
+		self.SlamEntity = nil
+		
+		timer.Simple(0.1, function()
+			if IsValid(Slam) then
+				Slam:SetOwner(nil)
+			end
+		end)
+		
+		return Slam
+	end
+	
+	return NULL
 end
 
 function SWEP:Throw(hardThrow)
@@ -179,7 +234,6 @@ function SWEP:Throw(hardThrow)
 	if SERVER then
 		local Slam = self:CreateSlam()
 		if not IsValid(Slam) then return end
-		--Slam:Arm(Owner)
 
 		local AimVec, ShootPos = Owner:GetAimVector(), Owner:GetShootPos()
 		local ThrowPos = ShootPos + AimVec * 25
@@ -187,7 +241,7 @@ function SWEP:Throw(hardThrow)
 		if Bone then
 			ThrowPos = Owner:GetBonePosition(Bone) + AimVec * 50
 		end
-		local ThrowTr = util.QuickTrace(ShootPos, (ThrowPos - ShootPos)*.5, {Owner, Grneade})
+		local ThrowTr = util.QuickTrace(ShootPos, (ThrowPos - ShootPos)*.5, {Owner, Slam})
 
 		if ThrowTr.Hit then
 			Slam:SetPos(ThrowTr.HitPos + ThrowTr.HitNormal * 5)
@@ -195,17 +249,22 @@ function SWEP:Throw(hardThrow)
 			Slam:SetPos(ThrowTr.HitPos)
 		end
 		Slam:SetAngles(AimVec:Angle())
+		
+		-- Ensure physics object is properly initialized
+		local Phys = Slam:GetPhysicsObject()
+		if IsValid(Phys) then
+			Phys:Wake()
+			Phys:EnableMotion(true)
+		end
+		
 		Slam:Plant(Owner)
 		Slam:Arm(Owner)
 
 		local ShootTr = util.QuickTrace(ShootPos, AimVec * 9e9, {Owner, Slam})
 		local ThrowDir = (ShootTr.HitPos - ThrowPos):GetNormalized()
-		local Phys = Slam:GetPhysicsObject()
 
 		local ThrowTime = vm:SequenceDuration()
 		self.FinishThrowTime = CurTime() + ThrowTime
-		--self.WasLookingAtWall = false
-		--print(vm:GetSequenceName(vm:GetSequence()), ThrowTime)
 
 	elseif CLIENT and IsFirstTimePredicted() then
 		
@@ -213,12 +272,6 @@ function SWEP:Throw(hardThrow)
 
 	Owner:SetAnimation(PLAYER_ATTACK1)
 	self:UpdateNextIdle()
-
-	timer.Simple(0.1, function()
-		if IsValid(Slam) then
-			Slam:SetOwner(nil)
-		end
-	end)
 end
 
 function SWEP:PrimaryAttack()
@@ -255,8 +308,13 @@ function SWEP:OnDrop()
 	if not IsFirstTimePredicted() then return end
 	local Ply = self.EZdropper
 	if self.Dropped then
-		local Slam = self:CreateSlam()
+		-- Use the original SLAM entity if available
+		local Slam = self.SlamEntity
 		if IsValid(Slam) then
+			-- Unparent and restore the SLAM
+			Slam:SetParent(nil)
+			Slam:SetNoDraw(false)
+			Slam:SetNotSolid(false)
 			Slam:SetPos(util.QuickTrace(Ply:GetShootPos(), Ply:GetAimVector() * 50, {Ply, Slam}).HitPos)
 		end
 	end
@@ -276,6 +334,14 @@ end
 
 function SWEP:OnRemove()
 	self:SCKHolster()
+
+	-- Clean up the parented SLAM entity
+	if IsValid(self.SlamEntity) then
+		self.SlamEntity:SetParent(nil)
+		self.SlamEntity:SetNoDraw(false)
+		self.SlamEntity:SetNotSolid(false)
+		self.SlamEntity:SetPos(self:GetPos() + Vector(0, 0, 10))
+	end
 
 	if IsValid(self.Owner) and CLIENT and self.Owner:IsPlayer() then
 		local vm = self.Owner:GetViewModel()
@@ -323,6 +389,14 @@ function SWEP:Holster(wep)
 end
 
 function SWEP:Think()
+	-- Check if the SLAM entity is still valid, remove weapon if not
+	if SERVER and not IsValid(self.SlamEntity) then
+		if IsValid(self.Owner) and self.Owner:IsPlayer() then
+			self.Owner:DropWeapon(self)
+		end
+		return
+	end
+
 	local Time = CurTime()
 	local Owner = self:GetOwner()
 	local vm = Owner:GetViewModel()
@@ -360,9 +434,9 @@ function SWEP:Think()
 				local Slam = tbl.ent
 		
 				if IsValid(Slam) and Slam:GetClass() == "ent_jack_gmod_ezslam" then
-					self.SlamEntity = Slam
+					--
+					Slam = JMod.RemoveFromInventory(Owner, Slam, nil, false, true)
 					self:GrabNewSlam(Slam)
-					Slam = JMod.RemoveFromInventory(ply, Slam, nil, false, false)
 					FoundSlam = true
 
 					local vm = Owner:GetViewModel()
