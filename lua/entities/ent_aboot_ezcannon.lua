@@ -22,6 +22,7 @@ ENT.Model = "models/props_phx/misc/smallcannon.mdl"
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
 	JMod.EZ_RESOURCE_TYPES.PROPELLANT,
+	JMod.EZ_RESOURCE_TYPES.EXPLOSIVES,
 	JMod.EZ_RESOURCE_TYPES.CHEMICALS,
 	JMod.EZ_RESOURCE_TYPES.PAPER,
 	JMod.EZ_RESOURCE_TYPES.STEEL,
@@ -358,7 +359,11 @@ if SERVER then
 		
 		if not self.LoadedProjectileType then
 			-- Check for antimatter loading and set plasma projectile
-			if typ == JMod.EZ_RESOURCE_TYPES.ANTIMATTER and amt >= 10 then
+			if typ == JMod.EZ_RESOURCE_TYPES.EXPLOSIVES and amt >= 10 then
+				self:SetProjectileType("ent_aboot_ezcannon_shot")
+
+				return 10
+			elseif typ == JMod.EZ_RESOURCE_TYPES.ANTIMATTER and amt >= 10 then
 				self:SetProjectileType("ent_aboot_ezcannon_shot_plasma")
 
 				return 10
@@ -688,17 +693,11 @@ if SERVER then
 				local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
 				
 				-- Play the main cannon firing sound
-				self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
-				--self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume * 0.7, FinalPitch * 0.8)
-				
-				-- Add secondary explosion sound for more impact
-				--self:EmitSound("ambient/explosions/explode_1.wav", FinalVolume * 0.7, FinalPitch * 0.8)
-				
-				-- Add mechanical recoil sound
-				--self:EmitSound("physics/metal/metal_canister_impact_hard1.wav", FinalVolume * 0.5, FinalPitch * 1.2)
+				--self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
+				self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume, FinalPitch * 0.8)
 				
 				-- Add cannon barrel resonance sound
-				--self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume * 0.4, FinalPitch * 0.6)
+				self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume, FinalPitch * 0.25)
 				
 				-- Supersonic sound effects for distant players
 				if IsSupersonic then
