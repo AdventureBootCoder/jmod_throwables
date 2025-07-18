@@ -283,19 +283,22 @@ if SERVER then
 		local mins, maxs = prop:GetCollisionBounds()
 		local size = maxs - mins
 		
-		-- Check if any two sides are greater than 8 units
+		-- Sort sides by size (largest first)
 		local sides = {size.x, size.y, size.z}
 		table.sort(sides, function(a, b) return a > b end)
 		
-		-- If the two largest sides are both > 8, reject the prop
-		if sides[1] > 8 and sides[2] > 8 and sides[3] > 20 then
+		-- Check various size constraints
+		if sides[1] > 50 then
+			return false
+		end
+		
+		if sides[1] > 12 and sides[2] > 12 then
 			return false
 		end
 		
 		return true
 	end
 
-	-- Function to calculate optimal launch angle for a prop
 	function ENT:CalculatePropLaunchAngle(prop)
 		if not IsValid(prop) then return 1, 0 end
 		
@@ -320,7 +323,6 @@ if SERVER then
 		return longestAxis, longestSize
 	end
 
-	--]]
 	function ENT:PhysicsCollide(data, physobj)
 		if not IsValid(self) then return end
 		local ent = data.HitEntity
@@ -417,55 +419,49 @@ if SERVER then
 
 		-- Check if cannon is already loaded
 		if self.LoadedProjectileType then return end
-		
-		-- Only load if player is holding it or force load is enabled
-		-- Check if entity is being held by physgun (which would cause mass issues)
-		local isHeldByPhysgun = false
-		if Projectile:IsPlayerHolding() then
-			-- Check if the entity has an extremely high mass (indicating physgun hold)
-			local phys = Projectile:GetPhysicsObject()
-			if IsValid(phys) and phys:GetMass() > 10000 then
-				isHeldByPhysgun = true
-			end
-		end
-		
+		if Projectile.EZalreadyLoaded then return end
+
 		if not (Projectile:IsPlayerHolding() or JMod.Config.ResourceEconomy.ForceLoadAllResources) then return end
-		
-		-- Check if entity is being held by physgun and give hint
-		if isHeldByPhysgun then
-			local owner = JMod.GetEZowner(self)
-			if IsValid(owner) and owner:IsPlayer() then
-				JMod.Hint(owner, "Drop the projectile from your physgun first!")
-			end
-			return
-		end
-		
+	
 		-- Check if the entity is constrained
-		if constraint.HasConstraints(Projectile) or not table.IsEmpty(Projectile:GetChildren()) then return end
-		
-		if Projectile.AlreadyLoaded then return end
+		if constraint.HasConstraints(Projectile) or next(Projectile:GetChildren()) then return end
 		
 		-- Check if the projectile type is supported
 		local Specs = self.ProjectileSpecs[Projectile:GetClass()]
 		if not Specs then return end
-		
-		-- For prop_physics, check if it's suitable
-		if Projectile:GetClass() == "prop_physics" and not self:IsPropSuitable(Projectile) then return end
 
-		Projectile.AlreadyLoaded = true
-		
-		-- Store the model name for prop_physics
+		-- For prop_physics, check if it's suitable
 		if Projectile:GetClass() == "prop_physics" then
+			if not self:IsPropSuitable(Projectile) then
+				-- Give feedback to the player about why the prop was rejected
+				local owner = JMod.GetEZowner(self)
+				if IsValid(owner) and owner:IsPlayer() then
+					JMod.Hint(owner, "cannon prop size")
+				end
+
+				return
+			end
 			self.PropModel = Projectile:GetModel()
 		end
-		--Projectile:SetNotSolid(true)
-		--Projectile:SetMoveType(MOVETYPE_NONE)
-		Projectile:ForcePlayerDrop()
-		Projectile:SetNoDraw(true)
 
-		timer.Simple(0.5, function()
-			if not IsValid(self) or not IsValid(Projectile) then return end
-					-- Save the projectile mass for distance calculations
+		Projectile.EZalreadyLoaded = true
+
+		timer.Simple(0.01, function()
+			if not IsValid(Projectile) then return end
+			if not IsValid(self) then 
+				Projectile.EZalreadyLoaded = false
+
+				return
+			end
+			
+			Projectile:SetNotSolid(true)
+			Projectile:SetMoveType(MOVETYPE_NONE)
+			Projectile:SetNoDraw(true)
+			Projectile:SetPos(self:GetPos())
+			Projectile:SetAngles(self:GetAngles())
+			Projectile:ForcePlayerDrop()
+
+			-- Save the projectile mass for distance calculations
 			local phys = Projectile:GetPhysicsObject()
 			if IsValid(phys) then
 				local mass = phys:GetMass()
@@ -482,12 +478,11 @@ if SERVER then
 					self.ProjectileMass = mass
 				end
 			else
-			-- Default mass if physics object is invalid
-			self.ProjectileMass = 100
-		end
+				self.ProjectileMass = 100
+			end
 
-		SafeRemoveEntity(Projectile)
-		self:SetProjectileType(Projectile:GetClass())
+			SafeRemoveEntity(Projectile)
+			self:SetProjectileType(Projectile:GetClass())
 		end)
 	end
 
@@ -570,7 +565,12 @@ if SERVER then
 	
 		timer.Simple(0.1, function()
 			if not IsValid(LaunchedProjectile) or not IsValid(self) then return end
-			LaunchedProjectile:GetPhysicsObject():SetVelocity(self:GetPhysicsObject():GetVelocity())
+			local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
+			LaunchPhys:SetVelocity(self:GetPhysicsObject():GetVelocity())
+
+			if Specs.UsePropModel then
+				LaunchPhys:SetMass(self.ProjectileMass)
+			end
 
 			if unload then
 				if LaunchedProjectile.SetState then
@@ -609,7 +609,6 @@ if SERVER then
 
 					return 
 				end
-				local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
 				local LaunchForce = Up * self.PropellantForce * self.CurrentPropellantPerShot * (Specs.ForceMult or 1)
 
 				-- Calculate if projectile will be supersonic
@@ -764,7 +763,6 @@ if SERVER then
 		-- Clear the loaded projectile after launching
 		self.LoadedProjectileType = nil
 		self.PropModel = nil
-		self.ProjectileMass = 0
 		self.EZlaunchableWeaponLoadTime = nil
 
 		self:UpdateWireOutputs()
