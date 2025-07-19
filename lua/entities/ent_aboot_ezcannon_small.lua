@@ -21,18 +21,16 @@ ENT.MaxPropellant = 100 -- Smaller propellant capacity
 ENT.BarrelLength = 40
 
 ENT.ProjectileSpecs = {
-	BaseClass = nil,
 	["prop_physics"] = {
 		UsePropModel = true
 	},
 	["ent_jack_gmod_ezherocket"] = {
-		ArmDelay = .1
+		ArmDelay = .1,
+		LaunchOffset = 10
 	},
 	["ent_jack_gmod_ezheatrocket"] = {
-		ArmDelay = .1
-	},
-	["ent_jack_gmod_ezsmallbomb"] = {
-		ArmDelay = 1
+		ArmDelay = .1,
+		LaunchOffset = 10
 	},
 	["ent_jack_gmod_ezstickynade"] = {
 		ArmDelay = .1
@@ -99,6 +97,7 @@ if CLIENT then
 		self.Propellant = 0
 		self.PropModel = nil
 		self.CurrentPropellantPerShot = self.DefaultPropellantPerShot
+		self.ProjectileSpecs.BaseClass = nil
 		
 		-- Custom model initialization for small cannon
 		self:DrawShadow(true)

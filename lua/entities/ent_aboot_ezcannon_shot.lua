@@ -17,7 +17,7 @@ ENT.JModEZstorable = true
 
 -- Base class configurable collision behavior
 ENT.CollisionSpeedThreshold = 600
-ENT.CollisionRequiresArmed = false
+ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
 ENT.FuseTime = 5
 ENT.TrailEffectScale = 3

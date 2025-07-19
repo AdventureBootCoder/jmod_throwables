@@ -285,7 +285,7 @@ if SERVER then
 		local size = maxs - mins
 		
 		-- Sort sides by size (largest first)
-		local sides = {size.x, size.y, size.z}
+		local sides = {math.Round(size.x), math.Round(size.y), math.Round(size.z)}
 		table.sort(sides, function(a, b) return a > b end)
 		
 		-- Check various size constraints
@@ -293,7 +293,7 @@ if SERVER then
 			return false
 		end
 		
-		if sides[1] > 12 and sides[2] > 12 then
+		if sides[2] > 15 and sides[3] > 15 then
 			return false
 		end
 		
@@ -557,12 +557,7 @@ if SERVER then
 		local CenterOffset = CannonCenter - ProjectileCenter
 		
 		-- Apply the center alignment offset plus the launch offset
-		local LaunchPos = SelfPos + CenterOffset + Up * self.BarrelLength
-		
-		-- Apply special offset if specified
-		if Specs.Offset then
-			LaunchPos = LaunchPos + Specs.Offset
-		end
+		local LaunchPos = SelfPos + CenterOffset + Up * (self.BarrelLength + (Specs.LaunchOffset or 0))
 		
 		-- Set the final position
 		LaunchedProjectile:SetPos(LaunchPos)
