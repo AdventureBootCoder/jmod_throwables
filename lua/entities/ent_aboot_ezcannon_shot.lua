@@ -49,7 +49,7 @@ if SERVER then
 				shouldDetonate = shouldDetonate and self.IsArmed
 			end
 			if shouldDetonate then
-				timer.Simple(self.CollisionDelay or 0.1, function()
+				timer.Simple(self.CollisionDelay or 0, function()
 					if IsValid(self) then
 						self:Detonate()
 					end

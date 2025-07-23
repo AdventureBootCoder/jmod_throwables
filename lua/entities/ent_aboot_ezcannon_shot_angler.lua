@@ -18,8 +18,8 @@ ENT.JModEZstorable = true
 
 -- Base class configurable collision behavior
 ENT.CollisionSpeedThreshold = 1000
-ENT.CollisionRequiresArmed = false
-ENT.CollisionDelay = 0.1
+ENT.CollisionRequiresArmed = true
+ENT.CollisionDelay = 0
 ENT.FuseTime = 10
 
 -- Angler-specific properties
@@ -45,21 +45,34 @@ if SERVER then
 		end)
 
 		self.IsArmed = false
-		self.SpinStartTime = CurTime()
 		self:SetColor(Color(0, 0, 0, 255))
 	end
 
+	function ENT:PhysicsCollide(data, physobj)
+		if data.DeltaTime > 0.2 then
+			if data.Speed > (self.CollisionSpeedThreshold or 600) then
+				local DeWeldMult = data.Speed / 1000
+				local EntToDeconstruct = data.HitEntity
+				timer.Simple(0, function()
+					if IsValid(EntToDeconstruct) then
+						local Phys = EntToDeconstruct:GetPhysicsObject()
+						if IsValid(Phys) and Phys:GetMass() < (5000 * DeWeldMult) then
+							constraint.RemoveAll(EntToDeconstruct)
+							Phys:EnableMotion(true)
+						end
+					end
+				end)
+				
+				self.NextDetonate = CurTime() + self.FuseTime
+			end
+			if data.Speed > 10 then
+				self:EmitSound(self.ImpactSound)
+			end
+		end
+	end
+
 	function ENT:Detonate()
-		-- Do focused shrapnel explosion
-		local Attacker = JMod.GetEZowner(self)
 		local Pos = self:GetPos()
-		
-		-- Smaller, more focused explosion
-		--JMod.FragSplosion(self, Pos + Vector(0, 0, 10), 500, 50, 150, Attacker, nil, nil, nil, true)
-		
-		-- Focused building wrecking with high power
-		-- This is really hacky, but it works for now
-		JMod.WreckBuildings(self, Pos, self.FocusedWreckPower, self.FocusedDamageRadius, true)
 		
 		-- Do some effects
 		local Effect = EffectData()

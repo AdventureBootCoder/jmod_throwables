@@ -18,7 +18,7 @@ ENT.JModEZstorable = true
 
 ENT.CollisionSpeedThreshold = 100
 ENT.CollisionRequiresArmed = true
-ENT.CollisionDelay = 0.1
+ENT.CollisionDelay = 0
 ENT.FuseTime = 3
 ENT.TrailEffectScale = 2
 ENT.TrailSoundVolume = 45
@@ -51,7 +51,6 @@ if SERVER then
 
 	-- Custom trail effect for plasma
 	function ENT:CreateTrailEffect()
-		-- Create electrical arcs behind the projectile
 		local vel = self:GetVelocity()
 		local pos = self:GetPos()
 		local backPos = pos - vel:GetNormalized() * 20
@@ -64,14 +63,6 @@ if SERVER then
 		ElectricEffect:SetRadius(200)
 		util.Effect("aboot_tesla_arc", ElectricEffect, true)
 		
-		-- Additional spark effects
-		local SparkEffect = EffectData()
-		SparkEffect:SetOrigin(pos)
-		SparkEffect:SetNormal(vel:GetNormalized())
-		SparkEffect:SetMagnitude(2)
-		SparkEffect:SetScale(1)
-		SparkEffect:SetRadius(5)
-		--util.Effect("Sparks", SparkEffect, true, true)
 		self:EmitSound("snd_jack_sss.wav", 45, math.Rand(90, 110))
 	end
 
