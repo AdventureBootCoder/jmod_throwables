@@ -96,9 +96,9 @@ if SERVER then
 		end
 	end
 
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos()
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		
 		-- Nuclear explosion effect
 		JMod.Sploom(Attacker, Pos, 60, 120)
@@ -107,13 +107,6 @@ if SERVER then
 		
 		-- Create fallout zone
 		self:CreateFalloutZone(Pos)
-		
-		-- Nuclear explosion visual effect
-		local Effect = EffectData()
-		Effect:SetOrigin(Pos)
-		Effect:SetScale(4)
-		Effect:SetNormal(Vector(0, 0, 1))
-		util.Effect("eff_jack_gmod_ezthermonuke", Effect, true, true)
 		
 		-- Nuclear explosion sound
 		self:EmitSound("snd_jack_c4splodeclose.ogg", 120, math.Rand(90, 110))

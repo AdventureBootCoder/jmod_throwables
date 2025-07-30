@@ -27,18 +27,18 @@ ENT.CreateTrailEffect = true
 ENT.Mass = 55 -- Copper is slightly heavier than steel
 ENT.ShellColor = Color(150, 100, 80, 255)
 ENT.LightningRadius = 300
-ENT.LightningDamage = 25
+ENT.LightningDamage = 100
 ENT.MaxChainJumps = 5
 ENT.ChainJumpRange = 256
 
 if SERVER then
 	function ENT:CreateTrailEffect()
 		-- Copper electrical trail effect
-		local Fsh = EffectData()
-		Fsh:SetOrigin(self:GetPos())
-		Fsh:SetScale(self.TrailEffectScale or 2)
-		Fsh:SetNormal(self:GetUp() * -1)
-		util.Effect("eff_jack_gmod_fuzeburn_smoky", Fsh, true, true)
+		local Zap = EffectData()
+		Zap:SetEntity(self)
+		Zap:SetScale(self.TrailEffectScale or 1)
+		Zap:SetRadius(256)
+		util.Effect("aboot_tesla_arc", Zap, true, true)
 		
 		-- Add electrical crackle sound
 		if math.random(1, 3) == 1 then
@@ -77,6 +77,8 @@ if SERVER then
 			local dmginfo = DamageInfo()
 			dmginfo:SetDamage(damage * (1 - currentJump * 0.2)) -- Damage decreases with each jump
 			dmginfo:SetAttacker(attacker)
+			dmginfo:SetDamagePosition(target:GetPos())
+			dmginfo:SetDamageForce(VectorRand() * 1000)
 			dmginfo:SetDamageType(DMG_SHOCK)
 			target:TakeDamageInfo(dmginfo)
 			
@@ -103,9 +105,9 @@ if SERVER then
 		end)
 	end
 
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos()
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		
 		-- Initial explosion
 		JMod.Sploom(Attacker, Pos, 40, 60)
@@ -132,10 +134,6 @@ if SERVER then
 	end
 
 elseif CLIENT then
-	function ENT:Initialize()
-		self.NoDrawTime = CurTime() + .5
-	end
-
 	function ENT:Draw()
 		self:DrawModel()
 	end

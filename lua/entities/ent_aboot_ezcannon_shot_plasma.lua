@@ -66,11 +66,11 @@ if SERVER then
 		self:EmitSound("snd_jack_sss.wav", 45, math.Rand(90, 110))
 	end
 
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		if self.Sploomd then return end
 		-- Do plasma damage instead of explosive
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos() + Vector(0, 0, 10)
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		
 		local PlasmaDamageCache = self.PlasmaDamage
 		local PlasmaRadiusCache = self.PlasmaRadius

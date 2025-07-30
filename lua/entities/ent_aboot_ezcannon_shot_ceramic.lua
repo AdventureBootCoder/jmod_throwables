@@ -27,10 +27,10 @@ ENT.CreateTrailEffect = false
 ENT.Mass = 35 -- Ceramic is lighter than metal
 
 if SERVER then
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		-- Do some shrapnel
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos()
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		JMod.FragSplosion(self, Pos + Vector(0, 0, 10), 1000, 100, 300, Attacker, nil, nil, nil, true)
 		JMod.WreckBuildings(self, Pos, 1, 1, true)
 		-- Break like a rock

@@ -102,10 +102,6 @@ if SERVER then
 	end
 
 elseif CLIENT then
-	function ENT:Initialize()
-		self.NoDrawTime = CurTime() + .5
-	end
-
 	function ENT:Draw()
 		self:DrawModel()
 	end

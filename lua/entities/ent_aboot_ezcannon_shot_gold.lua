@@ -66,9 +66,9 @@ if SERVER then
 		end
 	end
 
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos()
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		
 		-- Royal explosion
 		JMod.Sploom(Attacker, Pos, 50, 100)

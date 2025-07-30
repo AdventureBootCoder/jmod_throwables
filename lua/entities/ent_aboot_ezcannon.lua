@@ -43,9 +43,9 @@ ENT.DefaultPropellantPerShot = 20
 ENT.MaxPropellant = 200
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
-ENT.MaxPropellantForce = 50000000
-ENT.TargetPropellant = 80
-ENT.TargetPercentage = 0.2
+ENT.MaxPropellantForce = 1000000
+ENT.TargetPropellant = 100
+ENT.TargetPercentage = 0.8
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
@@ -180,7 +180,7 @@ function ENT:CalculateEstimatedRange()
 	-- Check if velocity exceeds server max velocity
 	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat() * 1.01
 	if InitialVelocity > MaxVelocity then
-		InitialVelocity = MaxVelocity
+		--InitialVelocity = MaxVelocity
 	end
 	
 	-- Get the cannon's current Up vector to determine launch angle
@@ -217,7 +217,7 @@ function ENT:CalculateEstimatedRange()
 	end
 	
 	-- Apply some realistic factors (air resistance, etc.)
-	EstimatedRange = EstimatedRange * 0.9 -- 90% efficiency factor
+	EstimatedRange = EstimatedRange * 0.8 -- 90% efficiency factor
 	
 	-- Convert to meters (1 Source unit = 0.01905 meters)
 	local MetersPerUnit = 0.01905
@@ -720,14 +720,13 @@ if SERVER then
 					end)--]]
 
 					-- Calculate the amount of time it would take before the projectile would get back to max velocity with 1 drag
-					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity)
+					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity) / MaxVelocity
 					print("TimeToMaxVelocity: " .. TimeToMaxVelocity)
 					if (TimeToMaxVelocity > 0) and (LaunchPhys:IsGravityEnabled()) then
-						LaunchedProjectile.EZgravity = LaunchedProjectile:GetGravity()
-						LaunchedProjectile:SetGravity(1)
+						LaunchPhys:EnableGravity(false)
 						timer.Simple(TimeToMaxVelocity, function()
 							if IsValid(LaunchPhys) then
-								LaunchedProjectile:SetGravity(LaunchedProjectile.EZgravity)
+								LaunchPhys:EnableGravity(true)
 							end
 						end)
 					end
@@ -1319,12 +1318,12 @@ elseif CLIENT then
 				net.SendToServer()
 				
 				-- Update range display in real-time
-				local newEstimatedRange, newCurrentLaunchAngle = cannon:CalculateEstimatedRange()
+				local newEstimatedRange, newCurrentLaunchAngle, newEndPos = cannon:CalculateEstimatedRange()
 				if newEstimatedRange and newEstimatedRange > 0 then
 					local newRangeText = "Range Info:\n"
 					newRangeText = newRangeText .. "Estimated: " .. newEstimatedRange .. " m\n"
 					newRangeText = newRangeText .. "Launch Angle: " .. newCurrentLaunchAngle .. "°\n"
-					newRangeText = newRangeText .. "Current Range"
+					newRangeText = newRangeText .. "End Pos: " .. math.Round(math.ceil(newEndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(newEndPos.y * 100) / 10000)
 					
 					local newRangeQuality = math.Clamp(newEstimatedRange / 200, 0, 1)
 					local newRangeColor = JMod.GoodBadColor(newRangeQuality, 200)

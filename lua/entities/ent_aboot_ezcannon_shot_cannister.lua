@@ -41,10 +41,10 @@ if SERVER then
 		self:EmitSound("snd_jack_sss.wav", 35, math.Rand(90, 110)) -- Quieter
 	end
 
-	function ENT:Detonate()
+	function ENT:Detonate(collisionData)
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos() + Vector(0, 0, 10)
-		local Vel = self:GetVelocity()
+		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
+		local Vel = (collisionData and collisionData.OurOldVelocity) or self:GetVelocity()
 		local Direction = Vel:GetNormalized()
 		local VelocityModifier = Vel:Length() / 2000
 		

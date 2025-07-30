@@ -57,7 +57,7 @@ if SERVER then
 			if shouldDetonate then
 				timer.Simple(self.CollisionDelay or 0, function()
 					if IsValid(self) then
-						self:Detonate()
+						self:Detonate(data)
 					end
 				end)
 			else
