@@ -29,22 +29,6 @@ ENT.HorizontalSpread = 60
 ENT.VerticalSpread = 15
 
 if SERVER then
-	function ENT:Initialize()
-		self:SetModel(self.Model)
-		self:SetMaterial(self.Material)
-		self:PhysicsInit(SOLID_VPHYSICS)
-		self:SetMoveType(MOVETYPE_VPHYSICS)
-		self:SetSolid(SOLID_VPHYSICS)
-		self:DrawShadow(true)
-		self:GetPhysicsObject():EnableDrag(false)
-
-		timer.Simple(0, function()
-			if IsValid(self) then
-				self:GetPhysicsObject():SetMass(40) -- Slightly lighter for canister
-			end
-		end)
-	end
-
 	-- Custom trail effect for canister
 	function ENT:CreateTrailEffect()
 		-- Minimal trail effect

@@ -19,6 +19,7 @@ ENT.Model = "models/props_phx/misc/potato_launcher.mdl"
 ENT.DefaultPropellantPerShot = 10 -- Less propellant per shot
 ENT.MaxPropellant = 100 -- Smaller propellant capacity
 ENT.BarrelLength = 40
+--ENT.PropellantForce = 5000
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {

@@ -37,6 +37,7 @@ if SERVER then
 		self:SetSolid(SOLID_VPHYSICS)
 		self:DrawShadow(true)
 		self:GetPhysicsObject():EnableDrag(false)
+		self:SetUseType(SIMPLE_USE)
 
 		timer.Simple(0, function()
 			if IsValid(self) then
@@ -85,8 +86,7 @@ if SERVER then
 		self:Remove()
 	end
 
-	function ENT:Arm()
-		self.IsArmed = true
+	function ENT:OnArmed()
 		local Phys = self:GetPhysicsObject()
 		if IsValid(Phys) then
 			Phys:AddAngleVelocity(self.SpinAxis * self.SpinSpeed)

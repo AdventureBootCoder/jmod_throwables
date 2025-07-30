@@ -105,13 +105,6 @@ if SERVER then
 		self:Remove()
 	end
 
-	function ENT:Arm()
-		self:SetIsArmed(true)
-		self:SetMaterial("models/props_combine/stasisshield_sheet")
-		self.IsArmed = true
-		self.NextDetonate = CurTime() + (self.FuseTime or 5)
-	end
-
 elseif CLIENT then
 	function ENT:Initialize()
 		self.NoDrawTime = CurTime() + .5

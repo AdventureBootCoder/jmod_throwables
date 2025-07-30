@@ -29,6 +29,13 @@ ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.LEAD,
 	JMod.EZ_RESOURCE_TYPES.TITANIUM,
 	JMod.EZ_RESOURCE_TYPES.COPPER,
+	JMod.EZ_RESOURCE_TYPES.URANIUM,
+	JMod.EZ_RESOURCE_TYPES.SILVER,
+	JMod.EZ_RESOURCE_TYPES.GOLD,
+	JMod.EZ_RESOURCE_TYPES.PLATINUM,
+	JMod.EZ_RESOURCE_TYPES.RUBBER,
+	JMod.EZ_RESOURCE_TYPES.TUNGSTEN,
+	JMod.EZ_RESOURCE_TYPES.CERAMIC,
 	JMod.EZ_RESOURCE_TYPES.ANTIMATTER
 }
 
@@ -36,7 +43,9 @@ ENT.DefaultPropellantPerShot = 20
 ENT.MaxPropellant = 200
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
-ENT.PropellantForce = 10000
+ENT.MaxPropellantForce = 50000000
+ENT.TargetPropellant = 80
+ENT.TargetPercentage = 0.2
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
@@ -80,6 +89,17 @@ ENT.ProjectileSpecs = {
 		ArmDelay = 1,
 		DefaultMass = 100
 	},
+	["ent_jack_gmod_ezcriticalityweapon"] = {
+		ArmDelay = 3,
+		ArmMethod = "Detonate",
+		ForceMult = 2,
+		DefaultMass = 150
+	},
+	["ent_jack_gmod_ezpowderkeg"] = {
+		ArmDelay = .2,
+		ArmMethod = "Detonate",
+		DefaultMass = 50
+	},
 	["ent_aboot_ezcannon_shot"] = {
 		ArmDelay = .1,
 		DefaultMass = 50
@@ -98,16 +118,37 @@ ENT.ProjectileSpecs = {
 		Angles = Angle(0, 90, 0),
 		DefaultMass = 50
 	},
-	["ent_jack_gmod_ezcriticalityweapon"] = {
-		ArmDelay = 3,
-		ArmMethod = "Detonate",
-		ForceMult = 2,
-		DefaultMass = 150
+	["ent_aboot_ezcannon_shot_ceramic"] = {
+		ArmDelay = .1,
+		DefaultMass = 35
 	},
-	["ent_jack_gmod_ezpowderkeg"] = {
-		ArmDelay = .2,
-		ArmMethod = "Detonate",
-		DefaultMass = 50
+	["ent_aboot_ezcannon_shot_copper"] = {
+		ArmDelay = .1,
+		DefaultMass = 55
+	},
+	["ent_aboot_ezcannon_shot_uranium"] = {
+		ArmDelay = .1,
+		DefaultMass = 75
+	},
+	["ent_aboot_ezcannon_shot_silver"] = {
+		ArmDelay = .1,
+		DefaultMass = 60
+	},
+	["ent_aboot_ezcannon_shot_gold"] = {
+		ArmDelay = .1,
+		DefaultMass = 65
+	},
+	["ent_aboot_ezcannon_shot_platinum"] = {
+		ArmDelay = .1,
+		DefaultMass = 70
+	},
+	["ent_aboot_ezcannon_shot_rubber"] = {
+		ArmDelay = .1,
+		DefaultMass = 30
+	},
+	["ent_aboot_ezcannon_shot_tungsten"] = {
+		ArmDelay = .1,
+		DefaultMass = 80
 	}
 }
 
@@ -121,14 +162,23 @@ function ENT:CalculateEstimatedRange()
 	local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
 	if not Specs then return 0 end
 	
-	-- Calculate launch force
-	local LaunchForce = self.PropellantForce * self.CurrentPropellantPerShot * (Specs.ForceMult or 1)
+	-- Calculate launch force using the same power curve as the actual launch
+	local MaxForce = self.MaxPropellantForce
+	local TargetPropellant = self.TargetPropellant
+	local TargetPercentage = self.TargetPercentage
+	
+	-- Calculate the curve parameters (same as in LaunchProjectile)
+	local k = -math.log(1 - TargetPercentage) / TargetPropellant
+	local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
+	
+	-- Apply projectile-specific multipliers
+	local LaunchForce = CalculatedForce * (Specs.ForceMult or 1)
 	
 	-- Calculate initial velocity (F = ma, so v = F/m)
 	local InitialVelocity = LaunchForce / self.ProjectileMass
 	
 	-- Check if velocity exceeds server max velocity
-	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
+	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat() * 1.01
 	if InitialVelocity > MaxVelocity then
 		InitialVelocity = MaxVelocity
 	end
@@ -172,9 +222,15 @@ function ENT:CalculateEstimatedRange()
 	-- Convert to meters (1 Source unit = 0.01905 meters)
 	local MetersPerUnit = 0.01905
 	local EstimatedRangeMeters = EstimatedRange * MetersPerUnit
+
+	-- Figure out the location of the projectile at the end of its flight
+	local FlatDir = self:GetUp()
+	FlatDir.z = 0
+	FlatDir:Normalize()
+	local EndPos = self:GetPos() + (FlatDir * EstimatedRangeMeters)
 	
 	-- Round to nearest meter for display
-	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle)
+	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), EndPos
 end
 
 if SERVER then
@@ -263,7 +319,7 @@ if SERVER then
 		elseif iname == "Unload" and value > 0 then
 			self:UnloadProjectile()
 		elseif iname == "PropellantPerShot" then
-			self.CurrentPropellantPerShot = math.Clamp(value, 1, 100)
+			self.CurrentPropellantPerShot = math.Clamp(value, 1, self.MaxPropellant or 100)
 			self:UpdateWireOutputs()
 			self:SyncStateToClients()
 		elseif iname == "CalculateRange" and value > 0 then
@@ -352,33 +408,35 @@ if SERVER then
 		end
 	end
 
+	ENT.ResourcesToShot = {
+		[JMod.EZ_RESOURCE_TYPES.STEEL] = {"ent_aboot_ezcannon_shot", 10},
+		[JMod.EZ_RESOURCE_TYPES.ANTIMATTER] = {"ent_aboot_ezcannon_shot_plasma", 10},
+		[JMod.EZ_RESOURCE_TYPES.LEAD] = {"ent_aboot_ezcannon_shot_cannister", 20},
+		[JMod.EZ_RESOURCE_TYPES.TITANIUM] = {"ent_aboot_ezcannon_shot_angler", 10},
+		[JMod.EZ_RESOURCE_TYPES.COPPER] = {"ent_aboot_ezcannon_shot_copper", 10},
+		[JMod.EZ_RESOURCE_TYPES.URANIUM] = {"ent_aboot_ezcannon_shot_uranium", 10},
+		[JMod.EZ_RESOURCE_TYPES.SILVER] = {"ent_aboot_ezcannon_shot_silver", 10},
+		[JMod.EZ_RESOURCE_TYPES.GOLD] = {"ent_aboot_ezcannon_shot_gold", 10},
+		[JMod.EZ_RESOURCE_TYPES.PLATINUM] = {"ent_aboot_ezcannon_shot_platinum", 10},
+		[JMod.EZ_RESOURCE_TYPES.RUBBER] = {"ent_aboot_ezcannon_shot_rubber", 10},
+		[JMod.EZ_RESOURCE_TYPES.CERAMIC] = {"ent_aboot_ezcannon_shot_ceramic", 10},
+		[JMod.EZ_RESOURCE_TYPES.PAPER] = {"ent_jack_gmod_ezflareprojectile", 20},
+		[JMod.EZ_RESOURCE_TYPES.TUNGSTEN] = {"ent_aboot_ezcannon_shot_tungsten", 10},
+	}
+
 	function ENT:TryLoadResource(typ, amt)
 		if(amt <= 0)then return 0 end
 		local Time = CurTime()
 		if (self.NextRefillTime > Time) or (typ == "generic") then return 0 end
 		
-		if not self.LoadedProjectileType then
+		if not self.LoadedProjectileType or self.LoadedProjectileType == "" then
 			-- Check for antimatter loading and set plasma projectile
-			if typ == JMod.EZ_RESOURCE_TYPES.EXPLOSIVES and amt >= 10 then
-				self:SetProjectileType("ent_aboot_ezcannon_shot")
+			for shotType, shot in pairs(self.ResourcesToShot) do
+				if typ == shotType and amt >= shot[2] then
+					self:SetProjectileType(shot[1])
 
-				return 10
-			elseif typ == JMod.EZ_RESOURCE_TYPES.ANTIMATTER and amt >= 10 then
-				self:SetProjectileType("ent_aboot_ezcannon_shot_plasma")
-
-				return 10
-			elseif typ == JMod.EZ_RESOURCE_TYPES.LEAD and amt >= 20 then
-				self:SetProjectileType("ent_aboot_ezcannon_shot_cannister")
-
-				return 20
-			elseif typ == JMod.EZ_RESOURCE_TYPES.TITANIUM and amt >= 10 then
-				self:SetProjectileType("ent_aboot_ezcannon_shot_angler")
-
-				return 10
-			elseif typ == JMod.EZ_RESOURCE_TYPES.PAPER and amt >= 20 then
-				self:SetProjectileType("ent_jack_gmod_ezflareprojectile")
-
-				return 20
+					return shot[2]
+				end
 			end
 		end
 		
@@ -423,7 +481,7 @@ if SERVER then
 		if not IsValid(Projectile) then return end
 
 		-- Check if cannon is already loaded
-		if self.LoadedProjectileType then return end
+		--if self.LoadedProjectileType then return end
 		if Projectile.EZalreadyLoaded then return end
 
 		if not (Projectile:IsPlayerHolding() or JMod.Config.ResourceEconomy.ForceLoadAllResources) then return end
@@ -498,14 +556,14 @@ if SERVER then
 
 	function ENT:LaunchProjectile(unload, ply)
 		local Time = CurTime()
-		if self.NextLaunchTime and (self.NextLaunchTime > Time) then return end
-		self.NextLaunchTime = Time + .1
+		if not(unload) and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
+		self.NextLaunchTime = Time + 1
 		
 		-- Check if we have a projectile loaded
 		if not self.LoadedProjectileType then return end
 		
 		ply = ply or JMod.GetEZowner(self)
-		local Up, Ford, Right = self:GetUp(), self:GetForward(), self:GetRight()
+		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
 		local SelfPos, LaunchAngle = self:GetPos(), self:GetAngles()
 		local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
 
@@ -609,28 +667,45 @@ if SERVER then
 
 					return 
 				end
-				local LaunchForce = Up * self.PropellantForce * self.CurrentPropellantPerShot * (Specs.ForceMult or 1)
+				
+				local MaxForce = self.MaxPropellantForce
+				local TargetPropellant = self.TargetPropellant
+				local TargetPercentage = self.TargetPercentage
+				
+				-- Calculate the curve parameters
+				-- Using formula: force = MaxForce * (1 - e^(-propellant * k))
+				-- Where k is calculated to give us 80% at 40 propellant
+				local k = -math.log(1 - TargetPercentage) / TargetPropellant
+				local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
+				
+				-- Apply the calculated force with projectile-specific multipliers
+				local Spread = 0.01
+				local LaunchDir = (Up + Right * math.Rand(-1, 1) * Spread + Forward * math.Rand(-1, 1) * Spread):GetNormalized()
+				local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1)
 
 				-- Calculate if projectile will be supersonic
 				local ProjectileMass = LaunchPhys:GetMass()
-				local LaunchVelocity = LaunchForce:Length() / ProjectileMass
+				local LaunchForceLength = LaunchForce:Length()
+				local LaunchVelocity = LaunchForceLength / ProjectileMass
 				local SpeedOfSound = 13500 -- 343 m/s in HU
 				local IsSupersonic = LaunchVelocity >= SpeedOfSound
 
 				-- Get server's max velocity setting and calculate overflow force
 				local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
-				local MaxForce = MaxVelocity * LaunchPhys:GetMass()
-				local LaunchForceLength = LaunchForce:Length()
+				local MaxForce = MaxVelocity * ProjectileMass
 				local OverflowForce = LaunchForceLength - MaxForce
-				if OverflowForce > 0 then
-					local OverflowBursts = math.min(math.ceil(OverflowForce / (MaxForce * 0.2)), 20)
+				--print("OverflowForce: " .. OverflowForce .. " MaxForce: " .. MaxForce .. " LaunchForceLength: " .. LaunchForceLength .. " ProjectileMass: " .. ProjectileMass .. " LaunchVelocity: " .. LaunchVelocity .. " SpeedOfSound: " .. SpeedOfSound .. " IsSupersonic: " .. tostring(IsSupersonic))
 
-					timer.Simple(0.1, function()
-						timer.Create("OverflowForce"..LaunchedProjectile:EntIndex(), 0.1, OverflowBursts, function()
+				if OverflowForce > 0 then
+					--local OverflowBursts = math.min(math.ceil(OverflowForce / (MaxForce * 0.2)), 20)
+
+					--[[timer.Simple(0.1, function()
+						timer.Create("OverflowForce"..LaunchedProjectile:EntIndex(), .5, OverflowBursts, function()
 							OverflowBursts = OverflowBursts - 1
 							if IsValid(LaunchedProjectile) and IsValid(LaunchPhys) and LaunchPhys:IsMotionEnabled() then
-								local ForceDir = LaunchPhys:GetVelocity():GetNormalized()
-								local ForceToApply = math.min(OverflowForce, MaxVelocity * 0.2)
+								local ForceDir = (LaunchPhys:GetVelocity() + LaunchForce):GetNormalized()
+								local ForceToApply = math.min(OverflowForce, MaxVelocity)
+								print("Applying force: " .. ForceToApply .. " to " .. tostring(LaunchedProjectile))
 								LaunchPhys:ApplyForceCenter(ForceDir * ForceToApply)
 								OverflowForce = OverflowForce - ForceToApply
 								if OverflowForce <= 0 then
@@ -642,14 +717,27 @@ if SERVER then
 								timer.Remove("OverflowForce"..LaunchedProjectile:EntIndex())
 							end
 						end)
-					end)
+					end)--]]
+
+					-- Calculate the amount of time it would take before the projectile would get back to max velocity with 1 drag
+					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity)
+					print("TimeToMaxVelocity: " .. TimeToMaxVelocity)
+					if (TimeToMaxVelocity > 0) and (LaunchPhys:IsGravityEnabled()) then
+						LaunchedProjectile.EZgravity = LaunchedProjectile:GetGravity()
+						LaunchedProjectile:SetGravity(1)
+						timer.Simple(TimeToMaxVelocity, function()
+							if IsValid(LaunchPhys) then
+								LaunchedProjectile:SetGravity(LaunchedProjectile.EZgravity)
+							end
+						end)
+					end
 				end
 
 				LaunchedProjectile:GetPhysicsObject():ApplyForceCenter(LaunchForce)
 				self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
 				-- Consume propellant
-				self.Propellant = self.Propellant - self.CurrentPropellantPerShot
+				--self.Propellant = self.Propellant - self.CurrentPropellantPerShot
 				self:UpdateWireOutputs()
 				
 				if self.HasRocketMotor and not Specs.NoRocketMotor then
@@ -755,15 +843,14 @@ if SERVER then
 			end
 		end)
 		-- Clear the loaded projectile after launching
-		self.LoadedProjectileType = nil
-		self.PropModel = nil
-		self.EZlaunchableWeaponLoadTime = nil
-
-		self:UpdateWireOutputs()
+		--self.LoadedProjectileType = nil
+		--self.PropModel = nil
+		--self.EZlaunchableWeaponLoadTime = nil
 		
 		-- Delay state sync to allow projectile to launch first
 		timer.Simple(0.5, function()
 			if IsValid(self) then
+				self:UpdateWireOutputs()
 				self:SyncStateToClients()
 			end
 		end)
@@ -891,12 +978,10 @@ if SERVER then
 		elseif command == "unload" then
 			cannon:UnloadProjectile()
 		elseif command == "setpropellant" then
-			local propellant = net.ReadInt(8)
+			local propellant = net.ReadUInt(8)
 			-- Validate propellant value
-			if propellant and propellant >= 1 and propellant <= 100 then
-				cannon.CurrentPropellantPerShot = propellant
-				cannon:UpdateWireOutputs()
-			end
+			cannon.CurrentPropellantPerShot = math.Clamp(propellant, 1, cannon.MaxPropellant or 100)
+			cannon:UpdateWireOutputs()
 		end
 	end)
 
@@ -1070,7 +1155,7 @@ elseif CLIENT then
 		rangeLabel:SetSize(160, 80)
 		
 		-- Calculate range and angle on client side
-		local estimatedRange, currentLaunchAngle = cannon:CalculateEstimatedRange()
+		local estimatedRange, currentLaunchAngle, EndPos = cannon:CalculateEstimatedRange()
 		
 		local rangeText = "Range Info:\n"
 		local rangeColor = Color(255, 255, 255, 200)
@@ -1079,7 +1164,7 @@ elseif CLIENT then
 			if estimatedRange and estimatedRange > 0 then
 				rangeText = rangeText .. "Estimated: " .. estimatedRange .. " m\n"
 				rangeText = rangeText .. "Launch Angle: " .. currentLaunchAngle .. "°\n"
-				rangeText = rangeText .. "Current Range"
+				rangeText = rangeText .. "End Pos: " .. math.Round(math.ceil(EndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(EndPos.y * 100) / 10000)
 				-- Use JMod.GoodBadColor for dynamic color coding
 				local rangeQuality = math.Clamp(estimatedRange / 200, 0, 1) -- Normalize to 0-1 (200m = max quality)
 				rangeColor = JMod.GoodBadColor(rangeQuality, 200)
@@ -1120,7 +1205,7 @@ elseif CLIENT then
 		slider:SetSize(360, 30)
 		slider:SetText("Propellant Amount")
 		slider:SetMin(1)
-		slider:SetMax(100)
+		slider:SetMax(cannon.MaxPropellant or 100)
 		slider:SetValue(cannon.CurrentPropellantPerShot or 20)
 		slider:SetDecimals(0)
 		
@@ -1230,7 +1315,7 @@ elseif CLIENT then
 				net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
 				net.WriteString("setpropellant")
-				net.WriteInt(math.floor(value), 8)
+				net.WriteUInt(math.floor(value), 8)
 				net.SendToServer()
 				
 				-- Update range display in real-time

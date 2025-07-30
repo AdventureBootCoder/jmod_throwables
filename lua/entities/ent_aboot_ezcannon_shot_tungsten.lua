@@ -9,7 +9,7 @@ ENT.PrintName = "EZ Cannon Shot (Tungsten)"
 ENT.NoSitAllowed = true
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
-ENT.Model = "models/props_phx/misc/smallcannonball.mdl"
+ENT.Model = "models/munitions/dart_100mm.mdl"
 ENT.Material = "pheonix_storm/gear"
 ENT.ModelScale = nil
 ENT.ImpactSound = "Metal_Box.ImpactHard"
@@ -23,41 +23,59 @@ ENT.CollisionDelay = 0.05 -- Faster detonation
 ENT.FuseTime = 8 -- Longer fuse time
 ENT.TrailEffectScale = 0 -- No trail effects
 ENT.TrailSoundVolume = 0 -- No trail sound
-ENT.PenetrationPower = 3 -- Number of props it can go through
-ENT.PenetrationDamage = 25 -- Damage to props when penetrating
+ENT.PenetrationDamage = 100 -- Increased damage to props when penetrating
 ENT.MaxPenetrationDistance = 200 -- Maximum distance for penetration
+ENT.Mass = 80 -- Heavier for better penetration
+ENT.DensityMultiplier = 0.8 -- How much density affects penetration
+local BaseClass = baseclass.Get("ent_aboot_ezcannon_shot")
 
 if SERVER then
-	function ENT:Initialize()
-		self:SetModel(self.Model)
-		self:SetMaterial(self.Material)
-		self:PhysicsInit(SOLID_VPHYSICS)
-		self:SetMoveType(MOVETYPE_VPHYSICS)
-		self:SetSolid(SOLID_VPHYSICS)
-		self:DrawShadow(true)
-		self:GetPhysicsObject():EnableDrag(false)
-
-		timer.Simple(0, function()
-			if IsValid(self) then
-				self:GetPhysicsObject():SetMass(80) -- Heavier for better penetration
-			end
-		end)
-
-		self.IsArmed = false
-		self.Penetrations = 0 -- Track how many props we've gone through
-		self.LastPenetrationTime = 0
-	end
-
 	function ENT:PhysicsCollide(data, physobj)
-		if data.DeltaTime > 0.2 then
+		if data.DeltaTime > 0.2 and self.IsArmed and data.Speed > 100 then
 			local hitEntity = data.HitEntity
 			local hitSpeed = data.Speed
+			local hitPos = data.HitPos
+			local hitNormal = data.HitNormal
+			local oldVelocity = data.OurOldVelocity
+			local flightNormal = data.OurOldVelocity:GetNormalized()
 			
-			-- Check if we hit a prop that we can penetrate
-			if IsValid(hitEntity) and hitEntity:GetClass() == "prop_physics" then
-				if self:CanPenetrate(hitEntity, hitSpeed) then
-					self:PenetrateProp(hitEntity, data.HitPos, data.HitNormal)
-					return -- Don't detonate, continue flying
+			-- Check if we hit an entity that we can penetrate
+			if IsValid(hitEntity) and not hitEntity:IsWorld() then
+				-- Try to penetrate using JMod.RicPenBullet principles
+				local penetrationResult = self:AttemptPenetration(hitPos, oldVelocity, hitEntity)
+				
+				if penetrationResult.success then
+					print("TUNGSTEN: Penetration SUCCESS - " .. hitEntity:GetClass())
+					
+					-- Create entry shrapnel explosion
+					--self:CreateShrapnelExplosion(hitPos, -flightNormal, oldVelocity, hitSpeed)
+					
+					-- Defer teleportation to avoid collision callback issues
+					timer.Simple(0, function()
+						if IsValid(self) then
+							self:SetPos(penetrationResult.exitPos)
+							
+							-- Apply velocity reduction based on penetration distance and material
+							local phys = self:GetPhysicsObject()
+							if IsValid(phys) then
+								local velocityReduction = penetrationResult.velocityReduction
+								local newVelocity = oldVelocity * velocityReduction
+								phys:SetVelocity(newVelocity)
+							end
+							
+							-- Create exit shrapnel explosion
+							self:CreateShrapnelExplosion(penetrationResult.exitPos, flightNormal, oldVelocity * penetrationResult.velocityReduction, hitSpeed)
+							
+							-- Deal damage to all penetrated entities
+							self:DealPenetrationDamage(penetrationResult.penetratedEntities, oldVelocity, penetrationResult.velocityReduction, hitSpeed)
+							
+							-- Create penetration effects
+							self:CreatePenetrationEffects(hitPos, penetrationResult.exitPos, hitNormal)
+						end
+					end)
+					return
+				else
+					print("TUNGSTEN: Penetration FAILED - " .. hitEntity:GetClass() .. " (Speed: " .. math.Round(hitSpeed) .. ")")
 				end
 			end
 			
@@ -79,47 +97,134 @@ if SERVER then
 		end
 	end
 
-	function ENT:CanPenetrate(prop, speed)
-		-- Check if we have penetration power left
-		if self.Penetrations >= self.PenetrationPower then
-			return false
+	function ENT:AttemptPenetration(hitPos, velocity, hitEntity)
+		local result = {
+			success = false,
+			exitPos = nil,
+			velocityReduction = 1.0,
+			penetratedEntities = {} -- Track entities and their detection count
+		}
+		
+		local velocityDir = velocity:GetNormalized()
+		local speed = velocity:Length()
+		
+		-- Use the same penetration logic as JMod.RicPenBullet
+		local initialTrace = util.TraceLine({
+			start = hitPos - velocityDir * 10,
+			endpos = hitPos + velocityDir * 50000,
+			filter = {self}
+		})
+		
+		if not initialTrace.Hit or initialTrace.HitSky then 
+			return result
 		end
 		
-		-- Check if we're going fast enough
-		if speed < 500 then
-			return false
+		local AVec = initialTrace.Normal
+		local IPos = initialTrace.HitPos
+		local TNorm = initialTrace.HitNormal
+		local SMul = self:GetSurfaceHardness(initialTrace.MatType)
+		
+		if not util.IsInWorld(IPos) then 
+			return result
 		end
 		
-		-- Check if enough time has passed since last penetration
-		if CurTime() - self.LastPenetrationTime < 0.1 then
-			return false
+		-- Calculate approach angle (same as JMod.RicPenBullet)
+		local ApproachAngle = -math.deg(math.asin(TNorm:Dot(AVec)))
+		local MaxRicAngle = 60 * SMul
+		
+		-- Check if we can penetrate (approach angle > max ricochet angle)
+		if ApproachAngle > (MaxRicAngle * 1.05) then
+			-- Calculate maximum penetration distance based on kinetic energy
+			local mass = self.Mass or 80
+			local kineticEnergy = 0.5 * mass * (speed * speed)
+			local maxDist = (kineticEnergy / (SMul * 2000)) * 0.06 -- More restrictive penetration calculation
+			maxDist = math.min(maxDist, self.MaxPenetrationDistance or 200)
+			
+			-- Find exit point using the same method as JMod.RicPenBullet
+			local SearchPos = IPos
+			local SearchDist = 5
+			local Penetrated = false
+			
+			while (not Penetrated) and (SearchDist < maxDist) do
+				SearchPos = IPos + AVec * SearchDist
+				local PeneTrace = util.QuickTrace(SearchPos, -AVec * SearchDist)
+				
+				-- Track entities encountered during penetration
+				if PeneTrace.Hit and IsValid(PeneTrace.Entity) and not PeneTrace.Entity:IsWorld() then
+					local entIndex = PeneTrace.Entity:EntIndex()
+					if not result.penetratedEntities[entIndex] then
+						result.penetratedEntities[entIndex] = {
+							entity = PeneTrace.Entity,
+							count = 0
+						}
+					end
+					result.penetratedEntities[entIndex].count = result.penetratedEntities[entIndex].count + 1
+					if not result.penetratedEntities[entIndex].penetrationPos then
+						result.penetratedEntities[entIndex].penetrationPos = PeneTrace.HitPos
+					end
+				end
+				
+				if (not PeneTrace.StartSolid) and PeneTrace.Hit then
+					Penetrated = true
+				else
+					SearchDist = SearchDist + 5
+				end
+			end
+			
+			if Penetrated then
+				result.success = true
+				result.exitPos = SearchPos + AVec * 10 -- Small offset to avoid collision
+				
+				-- Calculate velocity reduction based on penetration distance and material
+				local ThroughFrac = (1 - SearchDist / maxDist)
+				local velocityReduction = ThroughFrac * (0.7 + (SMul * 0.3)) -- Material affects velocity loss
+				result.velocityReduction = math.max(0.1, velocityReduction)
+				
+				-- Visual debug
+				debugoverlay.Line(hitPos, result.exitPos, 10, Color(255, 0, 0), true)
+				debugoverlay.Cross(hitPos, 5, 10, Color(255, 0, 0), true)
+				debugoverlay.Cross(result.exitPos, 5, 10, Color(0, 255, 0), true)
+				debugoverlay.Text(hitPos + Vector(0, 0, 10), "ENTRY", 10)
+				debugoverlay.Text(result.exitPos + Vector(0, 0, 10), "EXIT", 10)
+				
+				return result
+			end
 		end
 		
-		-- Check prop health and material
-		if prop:GetHealth() > 1000 then
-			return false -- Too strong to penetrate
-		end
-		
-		return true
+		return result
 	end
+	
+	-- Use the same surface hardness table as JMod.RicPenBullet
+	local SurfaceHardness = {
+		[MAT_METAL] = .95,
+		[MAT_COMPUTER] = .95,
+		[MAT_VENT] = .95,
+		[MAT_GRATE] = .95,
+		[MAT_FLESH] = .5,
+		[MAT_ALIENFLESH] = .3,
+		[MAT_SAND] = .1,
+		[MAT_DIRT] = .3,
+		[MAT_GRASS] = .2,
+		[74] = .1,
+		[85] = .2,
+		[MAT_WOOD] = .5,
+		[MAT_FOLIAGE] = .5,
+		[MAT_CONCRETE] = .9,
+		[MAT_TILE] = .8,
+		[MAT_SLOSH] = .05,
+		[MAT_PLASTIC] = .3,
+		[MAT_GLASS] = .6
+	}
 
-	function ENT:PenetrateProp(prop, hitPos, hitNormal)
-		-- Increment penetration counter
-		self.Penetrations = self.Penetrations + 1
-		self.LastPenetrationTime = CurTime()
-		
-		-- Damage the prop
-		local damage = DamageInfo()
-		damage:SetDamage(self.PenetrationDamage)
-		damage:SetAttacker(JMod.GetEZowner(self) or self)
-		damage:SetInflictor(self)
-		damage:SetDamageType(DMG_BULLET)
-		damage:SetDamagePosition(hitPos)
-		prop:TakeDamageInfo(damage)
-		
-		-- Create penetration effect
+	function ENT:GetSurfaceHardness(matType)
+
+		return SurfaceHardness[matType] or .99
+	end
+	
+	function ENT:CreatePenetrationEffects(entryPos, exitPos, hitNormal)
+		-- Create entry penetration effect
 		local effect = EffectData()
-		effect:SetOrigin(hitPos)
+		effect:SetOrigin(entryPos)
 		effect:SetNormal(hitNormal)
 		effect:SetScale(1)
 		util.Effect("eff_jack_gmod_metalpenetration", effect, true, true)
@@ -127,45 +232,81 @@ if SERVER then
 		-- Play penetration sound
 		self:EmitSound("physics/metal/metal_sheet_impact_hard" .. math.random(1, 3) .. ".wav", 75, math.Rand(90, 110))
 		
-		-- Slight velocity reduction
-		local phys = self:GetPhysicsObject()
-		if IsValid(phys) then
-			local vel = phys:GetVelocity()
-			phys:SetVelocity(vel * 0.9) -- Reduce velocity by 10%
-		end
-		
 		-- Create exit effect on the other side
-		timer.Simple(0.05, function()
-			if IsValid(self) then
-				local exitPos = self:GetPos()
-				local exitEffect = EffectData()
-				exitEffect:SetOrigin(exitPos)
-				exitEffect:SetNormal(-hitNormal)
-				exitEffect:SetScale(0.8)
-				util.Effect("eff_jack_gmod_metalpenetration", exitEffect, true, true)
-			end
-		end)
+		if exitPos then
+			local exitEffect = EffectData()
+			exitEffect:SetOrigin(exitPos)
+			exitEffect:SetNormal(-hitNormal)
+			exitEffect:SetScale(0.8)
+			util.Effect("eff_jack_gmod_metalpenetration", exitEffect, true, true)
+		end
 	end
 
-	function ENT:Detonate()
-		-- Tungsten rounds create focused explosions
+	function ENT:CreateShrapnelExplosion(pos, normal, velocity, speed)
+		-- Create a small shrapnel explosion at entry/exit points
 		local Attacker = JMod.GetEZowner(self)
-		local Pos = self:GetPos()
+		if not speed then
+			speed = velocity:Length()
+		end
 		
-		-- Smaller, more focused explosion
-		JMod.Sploom(Attacker, Pos, 30, 80) -- Reduced radius and damage
+		-- Scale shrapnel based on velocity
+		local shrapnelCount = math.Clamp(speed, 5, 20)
+		local shrapnelDamage = math.Clamp(speed / 10, 10, 50)
+		local shrapnelRange = math.Clamp(speed / 20, 50, 150)
 		
-		-- Create tungsten shrapnel effect
-		JMod.FragSplosion(self, Pos + Vector(0, 0, 10), 800, 50, 200, Attacker, nil, nil, nil, true)
+		-- Create shrapnel effect
+		JMod.FragSplosion(JMod.GetEZowner(self), pos, shrapnelCount, shrapnelDamage, shrapnelRange, Attacker, normal, .4, 2, true)
 		
-		-- Minimal building damage
-		JMod.WreckBuildings(self, Pos, 1.5, 0.5, true)
+		-- Create small explosion effect
+		local Effect = EffectData()
+		Effect:SetOrigin(pos)
+		Effect:SetScale(0.5)
+		Effect:SetNormal(normal)
+		util.Effect("eff_jack_gmod_tungstenexplosion", Effect, true, true)
 		
+		-- Play shrapnel sound
+		self:EmitSound("physics/metal/metal_sheet_impact_hard" .. math.random(1, 3) .. ".wav", 60, math.Rand(90, 110))
+	end
+	
+	function ENT:DealPenetrationDamage(penetratedEntities, originalVelocity, velocityReduction)
+		-- Deal damage to all entities that were penetrated
+		local Attacker = JMod.GetEZowner(self) or self
+		local originalSpeed = originalVelocity:Length()
+		
+		for entIndex, data in pairs(penetratedEntities) do
+			if IsValid(data.entity) then
+				-- Calculate damage based on detection count and velocity loss
+				local baseDamage = originalSpeed * 0.1 * data.count
+				local finalDamage = baseDamage * velocityReduction
+				
+				-- Ensure minimum damage
+				finalDamage = math.max(finalDamage, 1)
+				
+				-- Create damage info
+				local damage = DamageInfo()
+				damage:SetDamage(finalDamage)
+				damage:SetAttacker(Attacker)
+				damage:SetInflictor(self)
+				damage:SetDamageType(DMG_SNIPER)
+				damage:SetDamageForce(originalVelocity * 10)
+				damage:SetDamagePosition(data.penetrationPos or data.entity:GetPos())
+				
+				-- Apply damage
+				data.entity:TakeDamageInfo(damage)
+				
+				print("TUNGSTEN: Damaged " .. data.entity:GetClass() .. " - Count: " .. data.count .. " Damage: " .. math.Round(finalDamage, 1))
+			end
+		end
+	end
+
+	function ENT:Detonate(hitPos, hitNormal)
+		local Pos = hitPos or self:GetPos()
+		local Normal = hitNormal or Vector(0, 0, 1)
 		-- Tungsten-specific explosion effect
 		local Effect = EffectData()
 		Effect:SetOrigin(Pos)
 		Effect:SetScale(2)
-		Effect:SetNormal(Vector(0, 0, 1))
+		Effect:SetNormal(Normal)
 		util.Effect("eff_jack_gmod_tungstenexplosion", Effect, true, true)
 		
 		-- Play tungsten explosion sound
@@ -179,17 +320,8 @@ if SERVER then
 		if self.NextDetonate and self.NextDetonate < CurTime() then
 			self:Detonate()
 		end
-		self:NextThink(CurTime() + .1) -- Less frequent thinking
+		self:NextThink(CurTime() + 1) -- Less frequent thinking
 		return true
-	end
-
-	function ENT:Arm()
-		self.IsArmed = true
-		if self.FuseTime <= 0.05 then
-			self:Detonate()
-		else
-			self.NextDetonate = CurTime() + (self.FuseTime or 8)
-		end
 	end
 
 elseif CLIENT then
