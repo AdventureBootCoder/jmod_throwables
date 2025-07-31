@@ -14,13 +14,13 @@ ENT.ModelScale = nil
 ENT.ImpactSound = "Grenade.ImpactHard"
 ENT.CollisionGroup = COLLISION_GROUP_NONE
 ENT.JModEZstorable = true
-ENT.Mass = 50 -- Default steel mass
+ENT.Mass = 45
 
 -- Base class configurable collision behavior
 ENT.CollisionSpeedThreshold = 600
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
-ENT.FuseTime = 10
+ENT.FuseTime = 15
 ENT.TrailEffectScale = 3
 ENT.TrailSoundVolume = 65
 ENT.ShellColor = nil
@@ -50,10 +50,102 @@ if SERVER then
 
 	function ENT:PhysicsCollide(data, physobj)
 		if data.DeltaTime > 0.2 then
+
+			local SelfPos = self:GetPos()
+			if data.HitEntity == game.GetWorld() then
+				local WorldTr = util.TraceLine({
+					start = data.HitPos,
+					endpos = data.HitPos + data.OurOldVelocity,
+					filter = {self}
+				})--]]
+
+				local Constrained = self:IsPlayerHolding() or constraint.HasConstraints(self) or not self:GetPhysicsObject():IsMotionEnabled()
+
+				if WorldTr.HitSky and not(Constrained) then
+					local NewPos, TravelTime, NewVel = self:FindNextEmptySpace(data.OurOldVelocity)
+
+					if NewPos then
+						timer.Simple(0, function()
+							if IsValid(self) then
+								self:SetNoDraw(true)
+								self:SetNotSolid(true)
+								self:GetPhysicsObject():EnableMotion(false)
+							end
+						end)
+						timer.Simple(TravelTime, function()
+							if IsValid(self) then
+								self:SetNoDraw(false)
+								self:SetNotSolid(false)
+								self:SetPos(NewPos)
+								self:SetAngles(NewVel:Angle())
+								self:GetPhysicsObject():EnableMotion(true)
+								self:GetPhysicsObject():SetVelocity(NewVel)
+							end
+						end)
+					else
+						SafeRemoveEntityDelayed(self, 0)
+					end
+
+					return
+				end--]]
+
+				--print(data.Speed * physobj:GetMass())
+				local OurSpeed = data.OurOldVelocity:Length()
+				local Mass = physobj:GetMass()
+				local SurfaceData = util.GetSurfaceData(WorldTr.SurfaceProps)
+				local Hardness = (SurfaceData and SurfaceData.hardnessFactor) or 1
+				local OurNoseDir = -self:GetRight()
+				local AngleDiff = (OurNoseDir):Dot(-WorldTr.HitNormal)
+				--print("Pen Force Diff:", (OurSpeed * Mass) - (Hardness * 1000000))
+
+				if WorldTr.HitWorld and not(Constrained) and (AngleDiff > .75) and (OurSpeed * Mass > Hardness * 1000000) then
+					DetTime = math.Rand(.5, 2)
+
+					local Eff = EffectData()
+					Eff:SetOrigin(WorldTr.HitPos)
+					Eff:SetScale(10)
+					Eff:SetNormal(WorldTr.HitNormal)
+					util.Effect("eff_jack_sminebury", Eff, true, true)
+					--
+					timer.Simple(0.1, function()
+						if IsValid(self) then
+							local OldAngle = self:GetAngles()
+							local BuryAngle = data.OurOldVelocity:Angle()
+							BuryAngle:RotateAroundAxis(BuryAngle:Right(), self.JModPreferredCarryAngles.p)
+							BuryAngle:RotateAroundAxis(BuryAngle:Up(), self.JModPreferredCarryAngles.y)
+							BuryAngle:RotateAroundAxis(BuryAngle:Forward(), self.JModPreferredCarryAngles.r)
+							BuryAngle = LerpAngle(Hardness - .2, BuryAngle, OldAngle)
+							self:SetAngles(BuryAngle)
+							local StickOffSet = self:GetPos() - self:WorldSpaceCenter()
+							--print(StickOffSet)
+							self:SetPos(WorldTr.HitPos + StickOffSet + WorldTr.HitNormal * 10)
+							--
+							--[[local EmptySpaceTr = util.QuickTrace(self:LocalToWorld(self:OBBCenter()) + OurNoseDir * 100, -OurNoseDir * 200, {self})
+							if not EmptySpaceTr.StartSolid and not EmptySpaceTr.HitSky and EmptySpaceTr.Hit then
+								timer.Simple(DetTime + .1, function()
+									JMod.Sploom(JMod.GetEZowner(self), WorldTr.HitPos, 100)
+								end)
+								self:SetPos(EmptySpaceTr.HitPos + EmptySpaceTr.Normal * -EmptySpaceTr.Fraction * 100)
+							else
+								self:GetPhysicsObject():EnableMotion(false)
+							end--]]
+							self:GetPhysicsObject():EnableMotion(false)
+						end
+					end)
+
+					if math.random(1, 1000) == 1 then
+						-- A small chance for the bomb to not go off.
+						return
+					end
+				end
+			end
+
 			local shouldDetonate = data.Speed > (self.CollisionSpeedThreshold or 600)
+
 			if self.CollisionRequiresArmed then
 				shouldDetonate = shouldDetonate and self.IsArmed
 			end
+
 			if shouldDetonate then
 				timer.Simple(self.CollisionDelay or 0, function()
 					if IsValid(self) then
@@ -63,6 +155,33 @@ if SERVER then
 			else
 				self:EmitSound(self.ImpactSound)
 			end
+		end
+	end
+
+	function ENT:FindNextEmptySpace(vel)
+		local Pos = self:GetPos()
+		local Grav = physenv.GetGravity()
+
+		for i = 1, 100 do
+			Pos = Pos + (vel / 2)
+
+			if util.IsInWorld(Pos) then
+				local SkyTr = util.TraceLine({
+					start = Pos,
+					endpos = Pos - vel,
+					filter = {self},
+					mask = MASK_SOLID_BRUSHONLY
+				})
+				if SkyTr.HitSky then
+
+					Pos = SkyTr.HitPos + (SkyTr.Normal * -10)
+					debugoverlay.Cross(Pos, 5, 2, Color(255, 0, 0), true)
+					return Pos, i / 2, vel
+				end
+			else
+				debugoverlay.Cross(Pos, 5, 2, Color(0, 255, 200), true)
+			end
+			vel = vel + Grav / 2
 		end
 	end
 
@@ -96,6 +215,7 @@ if SERVER then
 	end
 
 	function ENT:CreateTrailEffect()
+		if self:GetNoDraw() then return end
 		local Fsh = EffectData()
 		Fsh:SetOrigin(self:GetPos())
 		Fsh:SetScale(self.TrailEffectScale or 3)
