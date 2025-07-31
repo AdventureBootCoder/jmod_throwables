@@ -40,12 +40,13 @@ ENT.EZconsumes = {
 }
 
 ENT.DefaultPropellantPerShot = 20
-ENT.MaxPropellant = 200
+ENT.MaxPropellant = 100
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
-ENT.MaxPropellantForce = 1000000
-ENT.TargetPropellant = 100
-ENT.TargetPercentage = 0.8
+ENT.MaxPropellantForce = 220000
+--ENT.PropellantForce = 10000
+ENT.TargetPropellant = 50
+ENT.TargetPercentage = .8
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
@@ -170,7 +171,7 @@ function ENT:CalculateEstimatedRange()
 	-- Calculate the curve parameters (same as in LaunchProjectile)
 	local k = -math.log(1 - TargetPercentage) / TargetPropellant
 	local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
-	
+
 	-- Apply projectile-specific multipliers
 	local LaunchForce = CalculatedForce * (Specs.ForceMult or 1)
 	
@@ -178,9 +179,10 @@ function ENT:CalculateEstimatedRange()
 	local InitialVelocity = LaunchForce / self.ProjectileMass
 	
 	-- Check if velocity exceeds server max velocity
-	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat() * 1.01
+	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
+	local OverChargeDistance = ((InitialVelocity - MaxVelocity) / MaxVelocity) * InitialVelocity
 	if InitialVelocity > MaxVelocity then
-		--InitialVelocity = MaxVelocity
+		InitialVelocity = MaxVelocity
 	end
 	
 	-- Get the cannon's current Up vector to determine launch angle
@@ -192,9 +194,6 @@ function ENT:CalculateEstimatedRange()
 	local RawAngle = math.deg(math.acos(math.Clamp(DotProduct, -1, 1)))
 	
 	-- Convert to launch angle
-	-- When cannon points up (0° from vertical), we want 90° launch angle
-	-- When cannon is level (90° from vertical), we want 0° launch angle
-	-- When cannon points down (180° from vertical), we want 0° launch angle
 	local LaunchAngle
 	if RawAngle <= 90 then
 		-- Cannon pointing up or level
@@ -205,19 +204,17 @@ function ENT:CalculateEstimatedRange()
 	end
 	
 	local Gravity = GetConVar("sv_gravity"):GetFloat() -- Source engine gravity in HU/s^2
-	
-	-- Handle special cases
-	if LaunchAngle <= 0.1 then
-		-- Cannon pointing down or level - no meaningful range
-		EstimatedRange = 0
-	else
+	local EstimatedRange = 0
+
+	if OverChargeDistance > 0 then
+		EstimatedRange = OverChargeDistance
+	end
+
+	if LaunchAngle > 0.1 then
 		local AngleRad = math.rad(LaunchAngle)
 		local Sin2Theta = math.sin(2 * AngleRad)
-		EstimatedRange = (InitialVelocity * InitialVelocity * Sin2Theta) / Gravity
+		EstimatedRange = EstimatedRange + ((InitialVelocity * InitialVelocity * Sin2Theta) / Gravity)
 	end
-	
-	-- Apply some realistic factors (air resistance, etc.)
-	EstimatedRange = EstimatedRange * 0.8 -- 90% efficiency factor
 	
 	-- Convert to meters (1 Source unit = 0.01905 meters)
 	local MetersPerUnit = 0.01905
@@ -225,9 +222,10 @@ function ENT:CalculateEstimatedRange()
 
 	-- Figure out the location of the projectile at the end of its flight
 	local FlatDir = self:GetUp()
+	--FlatDir.x = FlatDir.x + FlatDir.z
+	--FlatDir.y = FlatDir.y + FlatDir.z
 	FlatDir.z = 0
-	FlatDir:Normalize()
-	local EndPos = self:GetPos() + (FlatDir * EstimatedRangeMeters)
+	local EndPos = self:GetPos() + (FlatDir:GetNormalized() * EstimatedRange)
 	
 	-- Round to nearest meter for display
 	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), EndPos
@@ -557,7 +555,7 @@ if SERVER then
 	function ENT:LaunchProjectile(unload, ply)
 		local Time = CurTime()
 		if not(unload) and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
-		self.NextLaunchTime = Time + 1
+		self.NextLaunchTime = Time + 1.5
 		
 		-- Check if we have a projectile loaded
 		if not self.LoadedProjectileType then return end
@@ -721,8 +719,8 @@ if SERVER then
 
 					-- Calculate the amount of time it would take before the projectile would get back to max velocity with 1 drag
 					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity) / MaxVelocity
-					print("TimeToMaxVelocity: " .. TimeToMaxVelocity)
 					if (TimeToMaxVelocity > 0) and (LaunchPhys:IsGravityEnabled()) then
+						print("TimeToMaxVelocity: " .. TimeToMaxVelocity)
 						LaunchPhys:EnableGravity(false)
 						timer.Simple(TimeToMaxVelocity, function()
 							if IsValid(LaunchPhys) then
@@ -732,7 +730,7 @@ if SERVER then
 					end
 				end
 
-				LaunchedProjectile:GetPhysicsObject():ApplyForceCenter(LaunchForce)
+				LaunchPhys:ApplyForceCenter(LaunchForce)
 				self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
 				-- Consume propellant
@@ -805,10 +803,10 @@ if SERVER then
 										local SoundPos = PlayerPos + DirectionToCannon * 50 -- Offset 50 units towards cannon
 										
 										-- Play supersonic boom sound
-										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, BoomVolume, BoomPitch, 1, CHAN_STATIC)
+										sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 20, BoomPitch, BoomVolume, CHAN_STATIC)
 										
 										-- Add distant cannon echo
-										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, BoomVolume * 0.6, BoomPitch * 0.9, 1, CHAN_STATIC)
+										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
 									end
 								end)
 							end
@@ -952,7 +950,7 @@ if SERVER then
 		local isOwner = not(IsValid(owner)) or (owner and owner == ply)
 		local distance = cannon:GetPos():Distance(ply:GetPos())
 
-		if not isOwner or (distance > 100) then
+		if not isOwner or (distance > 256) then
 
 			return
 		end
