@@ -24,11 +24,11 @@ ENT.FuseTime = 8
 ENT.TrailEffectScale = 2
 ENT.TrailSoundVolume = 55
 ENT.CreateTrailEffect = true
-ENT.Mass = 55 -- Copper is slightly heavier than steel
+ENT.Mass = 50
 ENT.ShellColor = Color(150, 100, 80, 255)
 ENT.LightningRadius = 300
 ENT.LightningDamage = 100
-ENT.MaxChainJumps = 5
+ENT.MaxChainJumps = 10
 ENT.ChainJumpRange = 256
 
 if SERVER then

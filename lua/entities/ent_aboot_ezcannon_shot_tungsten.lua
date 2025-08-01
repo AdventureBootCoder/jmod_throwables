@@ -25,7 +25,7 @@ ENT.TrailEffectScale = 0 -- No trail effects
 ENT.TrailSoundVolume = 0 -- No trail sound
 ENT.PenetrationDamage = 100 -- Increased damage to props when penetrating
 ENT.MaxPenetrationDistance = 200 -- Maximum distance for penetration
-ENT.Mass = 80 -- Heavier for better penetration
+ENT.Mass = 40 -- Heavier for better penetration
 ENT.DensityMultiplier = 0.8 -- How much density affects penetration
 local BaseClass = baseclass.Get("ent_aboot_ezcannon_shot")
 
@@ -63,18 +63,25 @@ if SERVER then
 								phys:SetVelocity(newVelocity)
 							end
 							
-							-- Create exit shrapnel explosion
-							self:CreateShrapnelExplosion(penetrationResult.exitPos, flightNormal, oldVelocity * penetrationResult.velocityReduction, hitSpeed)
-							
 							-- Deal damage to all penetrated entities
 							self:DealPenetrationDamage(penetrationResult.penetratedEntities, oldVelocity, penetrationResult.velocityReduction, hitSpeed)
-							
+
+							-- Create exit shrapnel explosion
+							self:CreateShrapnelExplosion(penetrationResult.exitPos, flightNormal, oldVelocity * penetrationResult.velocityReduction, hitSpeed)
+		
 							-- Create penetration effects
 							self:CreatePenetrationEffects(hitPos, penetrationResult.exitPos, hitNormal)
+							
 						end
 					end)
 					return
 				else
+					timer.Simple(0, function()
+						-- Deal damage to all penetrated entities
+						if not IsValid(self) then return end
+						self:DealPenetrationDamage(penetrationResult.penetratedEntities, oldVelocity, penetrationResult.velocityReduction, hitSpeed)
+						self:Detonate()
+					end)
 					print("TUNGSTEN: Penetration FAILED - " .. hitEntity:GetClass() .. " (Speed: " .. math.Round(hitSpeed) .. ")")
 				end
 			end
@@ -111,7 +118,7 @@ if SERVER then
 		-- Use the same penetration logic as JMod.RicPenBullet
 		local initialTrace = util.TraceLine({
 			start = hitPos - velocityDir * 10,
-			endpos = hitPos + velocityDir * 50000,
+			endpos = hitPos + velocityDir * speed,
 			filter = {self}
 		})
 		
