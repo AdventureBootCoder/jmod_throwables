@@ -15,13 +15,18 @@ ENT.EZbuoyancy = .3
 ENT.Mass = 150 -- Lighter than the main cannon
 ENT.Model = "models/props_phx/misc/potato_launcher.mdl"
 
--- Override propellant settings for smaller cannon
-ENT.DefaultPropellantPerShot = 10 -- Less propellant per shot
-ENT.MaxPropellant = 100 -- Smaller propellant capacity
+ENT.DefaultPropellantPerShot = 10
+ENT.MaxPropellant = 50 
 ENT.BarrelLength = 40
 --ENT.PropellantForce = 5000
+ENT.MaxPropellantForce = 200000
+--ENT.TargetPropellant = 50
+--ENT.TargetPercentage = .8
+ENT.FireDelay = 1
+ENT.Spread = 0.001
 
-ENT.ProjectileSpecs = {
+ENT.ProjectileSpecs = nil
+ENT.ProjectileSpecsOverwrite = {
 	["prop_physics"] = {
 		UsePropModel = true
 	},
@@ -63,14 +68,31 @@ ENT.ProjectileSpecs = {
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
 	JMod.EZ_RESOURCE_TYPES.PROPELLANT,
+	JMod.EZ_RESOURCE_TYPES.EXPLOSIVES,
 	JMod.EZ_RESOURCE_TYPES.CHEMICALS,
 	JMod.EZ_RESOURCE_TYPES.PAPER,
 	JMod.EZ_RESOURCE_TYPES.STEEL,
-	JMod.EZ_RESOURCE_TYPES.LEAD
+	JMod.EZ_RESOURCE_TYPES.LEAD,
+	JMod.EZ_RESOURCE_TYPES.TITANIUM,
+	JMod.EZ_RESOURCE_TYPES.COPPER,
+	JMod.EZ_RESOURCE_TYPES.URANIUM,
+	JMod.EZ_RESOURCE_TYPES.SILVER,
+	JMod.EZ_RESOURCE_TYPES.GOLD,
+	JMod.EZ_RESOURCE_TYPES.PLATINUM,
+	JMod.EZ_RESOURCE_TYPES.RUBBER,
+	JMod.EZ_RESOURCE_TYPES.TUNGSTEN,
+	JMod.EZ_RESOURCE_TYPES.CERAMIC,
+	JMod.EZ_RESOURCE_TYPES.ANTIMATTER
 }
+local BaseClass = baseclass.Get("ent_aboot_ezcannon")
 
 if SERVER then
-	-- Override prop suitability check for smaller projectiles
+	function ENT:Initialize()
+		BaseClass.Initialize(self)
+		self.ProjectileSpecs = self.ProjectileSpecsOverwrite
+	end
+
+	-- Function to check if a prop_physics entity is suitable for loading
 	function ENT:IsPropSuitable(prop)
 		if not IsValid(prop) or prop:GetClass() ~= "prop_physics" then return false end
 		
@@ -78,12 +100,16 @@ if SERVER then
 		local mins, maxs = prop:GetCollisionBounds()
 		local size = maxs - mins
 		
-		-- Check if any two sides are greater than 6 units (smaller than main cannon)
-		local sides = {size.x, size.y, size.z}
+		-- Sort sides by size (largest first)
+		local sides = {math.Round(size.x), math.Round(size.y), math.Round(size.z)}
 		table.sort(sides, function(a, b) return a > b end)
 		
-		-- If the two largest sides are both > 6, reject the prop
-		if sides[1] > 6 and sides[2] > 6 and sides[3] > 15 then
+		-- Check various size constraints
+		if sides[1] > 45 then
+			return false
+		end
+		
+		if sides[2] > 6 and sides[3] > 6 then
 			return false
 		end
 		
@@ -98,7 +124,7 @@ if CLIENT then
 		self.Propellant = 0
 		self.PropModel = nil
 		self.CurrentPropellantPerShot = self.DefaultPropellantPerShot
-		self.ProjectileSpecs.BaseClass = nil
+		self.ProjectileSpecs = self.ProjectileSpecsOverwrite
 		
 		-- Custom model initialization for small cannon
 		self:DrawShadow(true)

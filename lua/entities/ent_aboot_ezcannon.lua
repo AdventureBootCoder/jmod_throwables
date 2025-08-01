@@ -47,6 +47,8 @@ ENT.MaxPropellantForce = 220000
 --ENT.PropellantForce = 10000
 ENT.TargetPropellant = 50
 ENT.TargetPercentage = .8
+ENT.FireDelay = 1.5
+ENT.Spread = 0.01
 
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
@@ -222,8 +224,6 @@ function ENT:CalculateEstimatedRange()
 
 	-- Figure out the location of the projectile at the end of its flight
 	local FlatDir = self:GetUp()
-	--FlatDir.x = FlatDir.x + FlatDir.z
-	--FlatDir.y = FlatDir.y + FlatDir.z
 	FlatDir.z = 0
 	local EndPos = self:GetPos() + (FlatDir:GetNormalized() * EstimatedRange)
 	
@@ -552,10 +552,81 @@ if SERVER then
 		self:LaunchProjectile(true)
 	end
 
+	function ENT:LaunchEffects(launchDir, launchForce, launchVelocity, isSupersonic)
+		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
+		local SelfPos = self:GetPos()
+
+		-- Enhanced cannon firing sound system
+		self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
+		--local CannonFireSound = "snd_jack_c4splodeclose.ogg"
+		
+		-- Calculate sound volume based on propellant amount
+		local BaseVolume = 85
+		local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
+		local FinalVolume = math.Clamp(BaseVolume * PropellantMultiplier, 70, 120)
+		
+		-- Calculate pitch variation based on propellant
+		local BasePitch = 70
+		local PitchVariation = math.random(-10, 10)
+		local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
+		
+		--self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
+		self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume, FinalPitch * 0.8)
+		self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume, FinalPitch * 0.25)
+		
+		-- Supersonic sound effects for distant players
+		if isSupersonic then
+			for _, Sply in player.Iterator() do
+				if IsValid(Sply) then
+					local Dist = SelfPos:Distance(Sply:GetPos())
+					local SoundDelay = Dist / 13500
+					
+					-- Only play for players within 6000 units (reasonable hearing distance)
+					if Dist >= 1000 and Dist <= 6000 then
+						timer.Simple(SoundDelay, function()
+							if IsValid(Sply) and IsValid(self) then
+								-- Supersonic boom sound for distant players
+								local BoomVolume = math.Clamp(100 - (Dist / 20), 30, 80)
+								local BoomPitch = math.Clamp(60 - (Dist / 100), 40, 80)
+								
+								-- Calculate sound position offset towards cannon
+								local PlayerPos = Sply:GetPos()
+								local DirectionToCannon = (SelfPos - PlayerPos):GetNormalized()
+								local SoundPos = PlayerPos + DirectionToCannon * 50 -- Offset 50 units towards cannon
+								
+								-- Play supersonic boom sound
+								sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 20, BoomPitch, BoomVolume, CHAN_STATIC)
+								
+								-- Add distant cannon echo
+								sound.Play("snd_jack_c4splodefar.ogg", SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
+							end
+						end)
+					end
+				end
+			end
+		end
+		
+		local Poof = EffectData()
+		Poof:SetOrigin(SelfPos + Up * 85)
+		Poof:SetNormal(Up)
+		Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
+		util.Effect("eff_jack_gmod_bphmuzzle", Poof, true, true)
+		
+		if self.CurrentPropellantPerShot > 50 then
+			local ExplosionPos = SelfPos + Up * 200
+			local ExplosionPower = 10 * (self.CurrentPropellantPerShot / 100)
+
+			JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
+		end
+		
+		-- Minor screen shake
+		util.ScreenShake(SelfPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
+	end
+
 	function ENT:LaunchProjectile(unload, ply)
 		local Time = CurTime()
 		if not(unload) and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
-		self.NextLaunchTime = Time + 1.5
+		self.NextLaunchTime = Time + (self.FireDelay or 1.5)
 		
 		-- Check if we have a projectile loaded
 		if not self.LoadedProjectileType then return end
@@ -564,6 +635,7 @@ if SERVER then
 		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
 		local SelfPos, LaunchAngle = self:GetPos(), self:GetAngles()
 		local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
+		if not Specs then return end
 
 		-- Create the projectile entity
 		local LaunchedProjectile = ents.Create(Specs.ReplaceEnt or self.LoadedProjectileType)
@@ -677,7 +749,7 @@ if SERVER then
 				local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
 				
 				-- Apply the calculated force with projectile-specific multipliers
-				local Spread = 0.01
+				local Spread = self.Spread or 0.01
 				local LaunchDir = (Up + Right * math.Rand(-1, 1) * Spread + Forward * math.Rand(-1, 1) * Spread):GetNormalized()
 				local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1)
 
@@ -685,15 +757,14 @@ if SERVER then
 				local ProjectileMass = LaunchPhys:GetMass()
 				local LaunchForceLength = LaunchForce:Length()
 				local LaunchVelocity = LaunchForceLength / ProjectileMass
-				local SpeedOfSound = 13500 -- 343 m/s in HU
-				local IsSupersonic = LaunchVelocity >= SpeedOfSound
 
 				-- Get server's max velocity setting and calculate overflow force
 				local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
 				local MaxForce = MaxVelocity * ProjectileMass
 				local OverflowForce = LaunchForceLength - MaxForce
-				--print("OverflowForce: " .. OverflowForce .. " MaxForce: " .. MaxForce .. " LaunchForceLength: " .. LaunchForceLength .. " ProjectileMass: " .. ProjectileMass .. " LaunchVelocity: " .. LaunchVelocity .. " SpeedOfSound: " .. SpeedOfSound .. " IsSupersonic: " .. tostring(IsSupersonic))
-
+				local SpeedOfSound = 13500 -- 343 m/s in HU
+				local IsSupersonic = LaunchVelocity >= SpeedOfSound
+				
 				if OverflowForce > 0 then
 					--local OverflowBursts = math.min(math.ceil(OverflowForce / (MaxForce * 0.2)), 20)
 
@@ -756,87 +827,7 @@ if SERVER then
 					self.HasRocketMotor = false
 				end
 
-				-- Enhanced cannon firing sound system
-				self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
-				
-				-- Main cannon firing sound - more impressive
-				local CannonFireSound = "snd_jack_c4splodeclose.ogg"
-				
-				-- Calculate sound volume based on propellant amount
-				local BaseVolume = 85
-				local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
-				local FinalVolume = math.Clamp(BaseVolume * PropellantMultiplier, 70, 120)
-				
-				-- Calculate pitch variation based on propellant
-				local BasePitch = 70
-				local PitchVariation = math.random(-10, 10)
-				local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
-				
-				-- Play the main cannon firing sound
-				--self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
-				self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume, FinalPitch * 0.8)
-				
-				-- Add cannon barrel resonance sound
-				self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume, FinalPitch * 0.25)
-				
-				-- Supersonic sound effects for distant players
-				if IsSupersonic then
-					-- Calculate delay based on distance and speed of sound
-					local CannonPos = self:GetPos()
-					
-					for _, Sply in player.Iterator() do
-						if IsValid(Sply) then
-							local Dist = CannonPos:Distance(Sply:GetPos())
-							local SoundDelay = Dist / SpeedOfSound
-							
-							-- Only play for players within 6000 units (reasonable hearing distance)
-							if Dist >= 1000 and Dist <= 6000 then
-								timer.Simple(SoundDelay, function()
-									if IsValid(Sply) and IsValid(self) then
-										-- Supersonic boom sound for distant players
-										local BoomVolume = math.Clamp(100 - (Dist / 20), 30, 80)
-										local BoomPitch = math.Clamp(60 - (Dist / 100), 40, 80)
-										
-										-- Calculate sound position offset towards cannon
-										local PlayerPos = Sply:GetPos()
-										local DirectionToCannon = (CannonPos - PlayerPos):GetNormalized()
-										local SoundPos = PlayerPos + DirectionToCannon * 50 -- Offset 50 units towards cannon
-										
-										-- Play supersonic boom sound
-										sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 20, BoomPitch, BoomVolume, CHAN_STATIC)
-										
-										-- Add distant cannon echo
-										sound.Play("snd_jack_c4splodefar.ogg", SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
-									end
-								end)
-							end
-						end
-					end
-				end
-				
-				local Poof = EffectData()
-				Poof:SetOrigin(SelfPos + Up * 85)
-				Poof:SetNormal(Up)
-				Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
-				util.Effect("eff_jack_gmod_bphmuzzle", Poof, true, true)
-				
-				-- Create explosion in front of cannon if propellant > 50
-				if self.CurrentPropellantPerShot > 50 then
-					-- Position explosion far enough away to not damage the cannon (150 units forward)
-					local ExplosionPos = SelfPos + Up * 200
-					
-					-- Calculate explosion power based on propellant amount
-					local ExplosionPower = 10 * (self.CurrentPropellantPerShot / 100)
-					
-					-- Create actual damaging explosion using JMod.Sploom
-					JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
-					
-					-- Add explosion sound
-					--self:EmitSound("ambient/explosions/explode_1.wav", FinalVolume * 0.8, FinalPitch * 0.9)
-				end
-				
-				-- Minor screen shake
-				util.ScreenShake(SelfPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
+				self:LaunchEffects(LaunchDir, LaunchForce, LaunchVelocity, IsSupersonic)
 			end
 		end)
 		-- Clear the loaded projectile after launching
@@ -1160,7 +1151,7 @@ elseif CLIENT then
 			-- Always show range if projectile is loaded, even if low
 			if estimatedRange and estimatedRange > 0 then
 				rangeText = rangeText .. "Estimated: " .. estimatedRange .. " m\n"
-				rangeText = rangeText .. "Launch Angle: " .. currentLaunchAngle .. "°\n"
+				rangeText = rangeText .. "Launch Angle: " .. tostring(currentLaunchAngle) .. "°\n"
 				rangeText = rangeText .. "End Pos: " .. math.Round(math.ceil(EndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(EndPos.y * 100) / 10000)
 				-- Use JMod.GoodBadColor for dynamic color coding
 				local rangeQuality = math.Clamp(estimatedRange / 200, 0, 1) -- Normalize to 0-1 (200m = max quality)
@@ -1168,7 +1159,7 @@ elseif CLIENT then
 			else
 				-- Show that range is being calculated
 				rangeText = rangeText .. "Calculating...\n"
-				rangeText = rangeText .. "Launch Angle: " .. currentLaunchAngle .. "°\n"
+				rangeText = rangeText .. "Launch Angle: " .. tostring(currentLaunchAngle) .. "°\n"
 				rangeText = rangeText .. "Range Unknown"
 				rangeColor = Color(255, 165, 0, 200) -- Orange for calculating
 			end
