@@ -23,7 +23,7 @@ ENT.FuseTime = 3
 ENT.TrailEffectScale = 2
 ENT.TrailSoundVolume = 45
 ENT.PlasmaRadius = 250
-ENT.PlasmaDamage = 1000
+ENT.PlasmaPower = 1
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 0, "IsArmed")
@@ -68,37 +68,12 @@ if SERVER then
 
 	function ENT:Detonate(collisionData)
 		if self.Sploomd then return end
+		self.Sploomd = true
 		-- Do plasma damage instead of explosive
 		local Attacker = JMod.GetEZowner(self)
 		local Pos = (collisionData and collisionData.HitPos + collisionData.HitNormal * -10) or self:GetPos()
 		
-		local PlasmaDamageCache = self.PlasmaDamage
-		local PlasmaRadiusCache = self.PlasmaRadius
-		timer.Simple(.1, function()
-			local MeltBlast = DamageInfo()
-			MeltBlast:SetInflictor(game.GetWorld())
-			MeltBlast:SetAttacker(game.GetWorld())
-			MeltBlast:SetDamage(PlasmaDamageCache)
-			MeltBlast:SetDamageType(DMG_DISSOLVE + DMG_PLASMA)
-			util.BlastDamageInfo(MeltBlast, Pos, PlasmaRadiusCache)
-			for k, v in pairs(ents.FindInSphere(Pos, PlasmaRadiusCache)) do 
-				if v:GetClass() == "npc_strider" then
-					v:Fire("break")
-				end
-			end
-		end)
-
-		self.Sploomd = true
-		local Blam = EffectData()
-		Blam:SetOrigin(Pos)
-		Blam:SetScale(1)
-		util.Effect("eff_jack_plastisplosion", Blam, true, true)
-		util.ScreenShake(Pos, 99999, 99999, 1, 750 * 5)
-
-		for i = 1, 2 do
-			sound.Play("BaseExplosionEffect.Sound", Pos, 120, math.random(90, 110))
-		end
-
+		JMod.AntimatterExplosion(Pos, Attacker, self.PlasmaPower, self.PlasmaRadius)
 		-- Plasma sound
 		self:EmitSound("ambient/energy/zap" .. math.random(1, 3) .. ".wav", 85, math.Rand(90, 110))
 		
