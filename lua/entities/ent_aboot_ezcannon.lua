@@ -43,8 +43,7 @@ ENT.DefaultPropellantPerShot = 20
 ENT.MaxPropellant = 100
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
-ENT.MaxPropellantForce = 220000
---ENT.PropellantForce = 10000
+ENT.MaxPropellantForce = 500000 * 2--* 3.3
 ENT.TargetPropellant = 50
 ENT.TargetPercentage = .8
 ENT.FireDelay = 1.5
@@ -557,48 +556,41 @@ if SERVER then
 		local SelfPos = self:GetPos()
 
 		-- Enhanced cannon firing sound system
-		self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
-		--local CannonFireSound = "snd_jack_c4splodeclose.ogg"
+		--self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
+		local CannonFireSound = "^phx/explode0"..math.random(0, 6)..".wav"
 		
 		-- Calculate sound volume based on propellant amount
-		local BaseVolume = 85
+		local BaseSoundLevel = 70
 		local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
-		local FinalVolume = math.Clamp(BaseVolume * PropellantMultiplier, 70, 120)
+		local FinalSoundLevel = math.Clamp(BaseSoundLevel * PropellantMultiplier, 70, 120)
 		
 		-- Calculate pitch variation based on propellant
 		local BasePitch = 70
 		local PitchVariation = math.random(-10, 10)
 		local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
 		
-		--self:EmitSound(CannonFireSound, FinalVolume, FinalPitch)
-		self:EmitSound("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", FinalVolume, FinalPitch * 0.8)
-		self:EmitSound("physics/metal/metal_barrel_impact_hard1.wav", FinalVolume, FinalPitch * 0.25)
+		self:EmitSound(CannonFireSound, 160, FinalPitch, 200)
 		
 		-- Supersonic sound effects for distant players
-		if isSupersonic then
+		if true then
 			for _, Sply in player.Iterator() do
 				if IsValid(Sply) then
 					local Dist = SelfPos:Distance(Sply:GetPos())
-					local SoundDelay = Dist / 13500
 					
 					-- Only play for players within 6000 units (reasonable hearing distance)
-					if Dist >= 1000 and Dist <= 6000 then
+					if Dist >= 1300 then
+						local SoundDelay = Dist / 13500
 						timer.Simple(SoundDelay, function()
-							if IsValid(Sply) and IsValid(self) then
-								-- Supersonic boom sound for distant players
-								local BoomVolume = math.Clamp(100 - (Dist / 20), 30, 80)
-								local BoomPitch = math.Clamp(60 - (Dist / 100), 40, 80)
-								
+							if IsValid(Sply) then
 								-- Calculate sound position offset towards cannon
 								local PlayerPos = Sply:GetPos()
 								local DirectionToCannon = (SelfPos - PlayerPos):GetNormalized()
-								local SoundPos = PlayerPos + DirectionToCannon * 50 -- Offset 50 units towards cannon
-								
-								-- Play supersonic boom sound
+								local SoundPos = PlayerPos + DirectionToCannon * 10 -- Offset 50 units towards cannon
+								local BoomPitch = FinalPitch
+								local BoomVolume = 100
+
 								sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 20, BoomPitch, BoomVolume, CHAN_STATIC)
-								
-								-- Add distant cannon echo
-								sound.Play("snd_jack_c4splodefar.ogg", SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
+								sound.Play(CannonFireSound, SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
 							end
 						end)
 					end
@@ -607,16 +599,16 @@ if SERVER then
 		end
 		
 		local Poof = EffectData()
-		Poof:SetOrigin(SelfPos + Up * 85)
+		Poof:SetOrigin(SelfPos + Up * 70 + Forward * -10)
 		Poof:SetNormal(Up)
 		Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
-		util.Effect("eff_jack_gmod_bphmuzzle", Poof, true, true)
+		util.Effect("eff_aboot_throwables_bpcmuzzle", Poof, true, true)
 		
 		if self.CurrentPropellantPerShot > 50 then
 			local ExplosionPos = SelfPos + Up * 200
 			local ExplosionPower = 10 * (self.CurrentPropellantPerShot / 100)
 
-			JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
+			--JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
 		end
 		
 		-- Minor screen shake
@@ -760,7 +752,7 @@ if SERVER then
 
 				-- Get server's max velocity setting and calculate overflow force
 				local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
-				local MaxForce = MaxVelocity * ProjectileMass
+				local MaxForce = ProjectileMass * MaxVelocity
 				local OverflowForce = LaunchForceLength - MaxForce
 				local SpeedOfSound = 13500 -- 343 m/s in HU
 				local IsSupersonic = LaunchVelocity >= SpeedOfSound
@@ -791,7 +783,6 @@ if SERVER then
 					-- Calculate the amount of time it would take before the projectile would get back to max velocity with 1 drag
 					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity) / MaxVelocity
 					if (TimeToMaxVelocity > 0) and (LaunchPhys:IsGravityEnabled()) then
-						print("TimeToMaxVelocity: " .. TimeToMaxVelocity)
 						LaunchPhys:EnableGravity(false)
 						timer.Simple(TimeToMaxVelocity, function()
 							if IsValid(LaunchPhys) then

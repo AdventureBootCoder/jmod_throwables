@@ -22,7 +22,7 @@ ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
 ENT.FuseTime = 15
 ENT.TrailEffectScale = 3
-ENT.TrailSoundVolume = 65
+ENT.TrailSoundVolume = 100
 ENT.ShellColor = nil
 
 if SERVER then

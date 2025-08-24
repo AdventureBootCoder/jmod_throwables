@@ -25,7 +25,7 @@ ENT.TrailEffectScale = 0 -- No trail effects
 ENT.TrailSoundVolume = 0 -- No trail sound
 ENT.PenetrationDamage = 100 -- Increased damage to props when penetrating
 ENT.MaxPenetrationDistance = 200 -- Maximum distance for penetration
-ENT.Mass = 40 -- Heavier for better penetration
+ENT.Mass = 20 -- Heavier for better penetration
 ENT.DensityMultiplier = 0.8 -- How much density affects penetration
 local BaseClass = baseclass.Get("ent_aboot_ezcannon_shot")
 
@@ -329,6 +329,10 @@ if SERVER then
 		end
 		self:NextThink(CurTime() + 1) -- Less frequent thinking
 		return true
+	end
+
+	function ENT:OnArmed()
+		util.SpriteTrail(self, 0, Color(255, 255, 255, 255), false, 10, 0, .25, 10, "trails/smoke")
 	end
 
 elseif CLIENT then
