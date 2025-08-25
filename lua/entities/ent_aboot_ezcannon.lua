@@ -43,7 +43,7 @@ ENT.DefaultPropellantPerShot = 20
 ENT.MaxPropellant = 100
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
-ENT.MaxPropellantForce = 500000 * 2--* 3.3
+ENT.MaxPropellantForce = 500000 * 3.3
 ENT.TargetPropellant = 50
 ENT.TargetPercentage = .8
 ENT.FireDelay = 1.5
@@ -562,7 +562,6 @@ if SERVER then
 		-- Calculate sound volume based on propellant amount
 		local BaseSoundLevel = 70
 		local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
-		local FinalSoundLevel = math.Clamp(BaseSoundLevel * PropellantMultiplier, 70, 120)
 		
 		-- Calculate pitch variation based on propellant
 		local BasePitch = 70
@@ -572,7 +571,7 @@ if SERVER then
 		self:EmitSound(CannonFireSound, 160, FinalPitch, 200)
 		
 		-- Supersonic sound effects for distant players
-		if true then
+		--[[if true then
 			for _, Sply in player.Iterator() do
 				if IsValid(Sply) then
 					local Dist = SelfPos:Distance(Sply:GetPos())
@@ -582,26 +581,28 @@ if SERVER then
 						local SoundDelay = Dist / 13500
 						timer.Simple(SoundDelay, function()
 							if IsValid(Sply) then
+								--print("Playing sound for player " .. Sply:GetName())
 								-- Calculate sound position offset towards cannon
-								local PlayerPos = Sply:GetPos()
+								local PlayerPos = Sply:EyePos()
 								local DirectionToCannon = (SelfPos - PlayerPos):GetNormalized()
-								local SoundPos = PlayerPos + DirectionToCannon * 10 -- Offset 50 units towards cannon
+								local SoundPos = PlayerPos + DirectionToCannon * 64
+								--debugoverlay.Cross(SoundPos, 10, 1, Color(255, 0, 0), true)
 								local BoomPitch = FinalPitch
 								local BoomVolume = 100
 
-								sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 20, BoomPitch, BoomVolume, CHAN_STATIC)
-								sound.Play(CannonFireSound, SoundPos, 20, BoomPitch * 0.9, BoomVolume * 0.6, CHAN_STATIC)
+								sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 50, BoomPitch, BoomVolume, CHAN_STATIC)
+								sound.Play(CannonFireSound, SoundPos, 50, BoomPitch * 0.9, BoomVolume * 0.75, CHAN_STATIC)
 							end
 						end)
 					end
 				end
 			end
-		end
+		end--]]
 		
 		local Poof = EffectData()
 		Poof:SetOrigin(SelfPos + Up * 70 + Forward * -10)
 		Poof:SetNormal(Up)
-		Poof:SetScale(1.5 * (self.CurrentPropellantPerShot / 100))
+		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
 		util.Effect("eff_aboot_throwables_bpcmuzzle", Poof, true, true)
 		
 		if self.CurrentPropellantPerShot > 50 then
