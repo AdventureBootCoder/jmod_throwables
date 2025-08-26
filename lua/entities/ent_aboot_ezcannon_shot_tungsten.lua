@@ -319,7 +319,12 @@ if SERVER then
 		-- Play tungsten explosion sound
 		self:EmitSound("physics/metal/metal_box_break" .. math.random(1, 2) .. ".wav", 85, math.Rand(80, 100))
 		
-		self:Remove()
+		self.IsArmed = false
+		timer.Simple(0.1, function()
+			if IsValid(self) then
+				self:Remove()
+			end
+		end)
 	end
 
 	function ENT:Think()

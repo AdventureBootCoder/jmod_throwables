@@ -604,6 +604,12 @@ if SERVER then
 		Poof:SetNormal(Up)
 		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
 		util.Effect("eff_aboot_throwables_bpcmuzzle", Poof, true, true)
+
+		--[[local Poof = EffectData()
+		Poof:SetOrigin(SelfPos + Up * -30 + Forward * -30)
+		Poof:SetNormal(-Forward)
+		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
+		util.Effect("eff_aboot_throwables_bpcexhaust", Poof, true, true)--]]
 		
 		if self.CurrentPropellantPerShot > 50 then
 			local ExplosionPos = SelfPos + Up * 200
@@ -684,7 +690,7 @@ if SERVER then
 		LaunchedProjectile:SetPos(LaunchPos)
 		local Nocollider = constraint.NoCollide(self, LaunchedProjectile, 0, 0, true)
 	
-		timer.Simple(0.1, function()
+		timer.Simple(0, function()
 			if not IsValid(LaunchedProjectile) or not IsValid(self) then return end
 			local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
 			LaunchPhys:SetVelocity(self:GetPhysicsObject():GetVelocity())
@@ -1028,7 +1034,7 @@ elseif CLIENT then
 		
 		-- Calculate detail draw based on distance
 		local Closeness = LocalPlayer():GetFOV() * (EyePos():Distance(SelfPos))
-		local DetailDraw = Closeness < 120000 -- cutoff point is 400 units when the fov is 90 degrees
+		local DetailDraw = true--Closeness < 120000 -- cutoff point is 400 units when the fov is 90 degrees
 		
 		if DetailDraw then
 			-- Render hatch model
