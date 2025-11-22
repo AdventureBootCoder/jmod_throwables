@@ -19,42 +19,44 @@ ENT.DefaultPropellantPerShot = 10
 ENT.MaxPropellant = 50 
 ENT.BarrelLength = 40
 --ENT.PropellantForce = 5000
-ENT.MaxPropellantForce = 200000
---ENT.TargetPropellant = 50
---ENT.TargetPercentage = .8
+ENT.MaxPropellantForce = 500000
+ENT.TargetPropellant = 40
+ENT.TargetPercentage = .8
 ENT.FireDelay = 1
 ENT.Spread = 0.001
+ENT.MaxPropSize = Vector(45, 6, 6) -- Max dimensions: largest, second largest, smallest (smaller than main cannon)
 
-ENT.ProjectileSpecs = nil
-ENT.ProjectileSpecsOverwrite = {
+ENT.ProjectileSpecs = {
 	["prop_physics"] = {
 		UsePropModel = true
 	},
 	["ent_jack_gmod_ezherocket"] = {
-		ArmDelay = .1,
-		LaunchOffset = 10
+		ArmDelay = .5,
+		LaunchOffset = 10,
+		ForceMult = 2
 	},
 	["ent_jack_gmod_ezheatrocket"] = {
-		ArmDelay = .1,
-		LaunchOffset = 10
+		ArmDelay = .5,
+		LaunchOffset = 10,
+		ForceMult = 2
 	},
 	["ent_jack_gmod_ezstickynade"] = {
-		ArmDelay = .1
+		ArmDelay = .05
 	},
 	["ent_jack_gmod_ezfragnade"] = {
-		ArmDelay = .1
+		ArmDelay = 0
 	},
 	["ent_jack_gmod_ezimpactnade"] = {
-		ArmDelay = .1
+		ArmDelay = 0
 	},
 	["ent_jack_gmod_ezfirenade"] = {
-		ArmDelay = .1
+		ArmDelay = .05
 	},
 	["ent_jack_gmod_ezflashbang"] = {
-		ArmDelay = .1
+		ArmDelay = .05
 	},
 	["ent_jack_gmod_ezsmokegrenade"] = {
-		ArmDelay = .1
+		ArmDelay = .05
 	},
 	["ent_jack_gmod_ezroadflare"] = {
 		ArmDelay = 1
@@ -84,38 +86,6 @@ ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.CERAMIC,
 	JMod.EZ_RESOURCE_TYPES.ANTIMATTER
 }
-local BaseClass = baseclass.Get("ent_aboot_ezcannon")
-
-if SERVER then
-	function ENT:Initialize()
-		BaseClass.Initialize(self)
-		self.ProjectileSpecs = self.ProjectileSpecsOverwrite
-	end
-
-	-- Function to check if a prop_physics entity is suitable for loading
-	function ENT:IsPropSuitable(prop)
-		if not IsValid(prop) or prop:GetClass() ~= "prop_physics" then return false end
-		
-		-- Get the model bounds
-		local mins, maxs = prop:GetCollisionBounds()
-		local size = maxs - mins
-		
-		-- Sort sides by size (largest first)
-		local sides = {math.Round(size.x), math.Round(size.y), math.Round(size.z)}
-		table.sort(sides, function(a, b) return a > b end)
-		
-		-- Check various size constraints
-		if sides[1] > 45 then
-			return false
-		end
-		
-		if sides[2] > 6 and sides[3] > 6 then
-			return false
-		end
-		
-		return true
-	end
-end
 
 if CLIENT then
 	-- Override client initialization for custom models
@@ -124,7 +94,7 @@ if CLIENT then
 		self.Propellant = 0
 		self.PropModel = nil
 		self.CurrentPropellantPerShot = self.DefaultPropellantPerShot
-		self.ProjectileSpecs = self.ProjectileSpecsOverwrite
+		self.ProjectileSpecs = self.ProjectileSpecs
 		
 		-- Custom model initialization for small cannon
 		self:DrawShadow(true)

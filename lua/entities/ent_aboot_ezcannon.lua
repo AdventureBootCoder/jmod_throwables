@@ -45,11 +45,13 @@ ENT.NextRefillTime = 0
 ENT.BarrelLength = 30
 ENT.MaxPropellantForce = 500000 * 3.3
 ENT.TargetPropellant = 50
-ENT.TargetPercentage = .8
+ENT.TargetPercentage = .5
 ENT.FireDelay = 1.5
 ENT.Spread = 0.01
+ENT.MaxPropSize = Vector(50, 15, 15) -- Max dimensions: largest, second largest, smallest
+ENT.ProjectileSpecs = nil
 
-ENT.ProjectileSpecs = {
+local ProjectileSpecs = {
 	["prop_physics"] = {
 		UsePropModel = true,
 		DefaultMass = 100
@@ -70,9 +72,6 @@ ENT.ProjectileSpecs = {
 		ArmDelay = 1,
 		DefaultMass = 80
 	},
-	--["ent_jack_gmod_ezstickynade"] = {
-	--	ArmDelay = .1
-	--},
 	["ent_jack_gmod_ezhebomb"] = {
 		ArmDelay = .2,
 		DefaultMass = 100
@@ -154,6 +153,17 @@ ENT.ProjectileSpecs = {
 	}
 }
 
+-- Function to calculate force based on propellant amount using exponential curve
+-- Formula: force = MaxForce * (1 - e^(-propellant * k))
+-- Where k is calculated to give us targetpower% at targetpropellant amount
+function ENT:CalculateForceCurve(propellantAmount)
+	-- Calculate the curve parameter k
+	local k = -math.log(1 - self.TargetPercentage) / self.TargetPropellant
+	
+	-- Calculate and return the force magnitude
+	return self.MaxPropellantForce * (1 - math.exp(-propellantAmount * k))
+end
+
 -- Function to calculate estimated range based on projectile mass and propellant
 function ENT:CalculateEstimatedRange()
 	if not self.LoadedProjectileType or not self.ProjectileMass or not self.CurrentPropellantPerShot then
@@ -164,14 +174,8 @@ function ENT:CalculateEstimatedRange()
 	local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
 	if not Specs then return 0 end
 	
-	-- Calculate launch force using the same power curve as the actual launch
-	local MaxForce = self.MaxPropellantForce
-	local TargetPropellant = self.TargetPropellant
-	local TargetPercentage = self.TargetPercentage
-	
-	-- Calculate the curve parameters (same as in LaunchProjectile)
-	local k = -math.log(1 - TargetPercentage) / TargetPropellant
-	local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
+	-- Calculate launch force using centralized force curve function
+	local CalculatedForce = self:CalculateForceCurve(self.CurrentPropellantPerShot)
 
 	-- Apply projectile-specific multipliers
 	local LaunchForce = CalculatedForce * (Specs.ForceMult or 1)
@@ -269,6 +273,7 @@ if SERVER then
 		self.ProjectileMass = self.ProjectileMass or 0
 		self.EstimatedRange = 0
 		self.LastRangeCalculation = 0
+		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
 		---
 		if istable(WireLib) then
 			self.Inputs = WireLib.CreateInputs(self, {"Launch [NORMAL]", "Unload [NORMAL]", "PropellantPerShot [NORMAL]", "CalculateRange [NORMAL]"}, {"Fires the loaded Projectile", "Unloads Projectile", "Sets the amount of propellant used per shot (1-100)", "Triggers range calculation update"})
@@ -341,12 +346,13 @@ if SERVER then
 		local sides = {math.Round(size.x), math.Round(size.y), math.Round(size.z)}
 		table.sort(sides, function(a, b) return a > b end)
 		
-		-- Check various size constraints
-		if sides[1] > 50 then
+		-- Check size constraints using MaxPropSize vector
+		-- MaxPropSize components: x = max largest dimension, y = max second dimension, z = max third dimension
+		if sides[1] > self.MaxPropSize.x then
 			return false
 		end
 		
-		if sides[2] > 15 and sides[3] > 15 then
+		if sides[2] > self.MaxPropSize.y and sides[3] > self.MaxPropSize.z then
 			return false
 		end
 		
@@ -622,6 +628,106 @@ if SERVER then
 		util.ScreenShake(SelfPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
 	end
 
+	-- Helper function to create self-contained step-based teleportation and tracking system
+	function ENT:CreateProjectileTracker(projectile, phys, launchDir, hadMotion, initialVelocity, maxVelLimit, hullSize)
+		local timerName = "JMod_EZCannon_Tracker_" .. projectile:EntIndex()
+		
+		-- Get server tick rate for consistent step timing
+		local tickRate = engine.TickInterval()
+		
+		-- Initialize velocity tracking
+		local currentVelocity = initialVelocity
+		
+		-- Get projectile drag coefficient for accurate velocity reduction
+		local drag = phys:GetSpeedDamping() or 0
+		local mass = phys:GetMass()
+		
+		-- Calculate velocity decay factor based on drag
+		-- Drag force: F = -drag * v
+		-- Acceleration: a = F/m = -drag * v / m
+		-- Velocity decay: v(t) = v0 * e^(-drag * t / m)
+		-- For discrete steps: v_new = v_old * e^(-drag * tickRate / mass)
+		local dragDecayFactor
+		local linearReductionPerTick = nil
+		if drag > 0.001 then
+			-- Use exponential decay based on drag
+			dragDecayFactor = math.exp(-drag * tickRate / math.max(mass, 0.1))
+		else
+			-- Fallback: if drag is very low or zero, use linear reduction
+			-- Calculate how many steps it would take to reduce to max velocity
+			local velocityDiff = initialVelocity - maxVelLimit
+			local estimatedSteps = math.max(1, math.ceil(velocityDiff / (maxVelLimit * tickRate)))
+			linearReductionPerTick = velocityDiff / estimatedSteps
+			dragDecayFactor = nil -- Signal to use linear reduction
+		end
+		
+		local projectileCenter = projectile:OBBCenter()
+		local gravity = physenv.GetGravity() * projectile:GetGravity()
+		
+		-- Step-based teleportation and velocity reduction timer
+		timer.Create(timerName, tickRate, 0, function()
+			if not IsValid(projectile) or not IsValid(phys) or (hadMotion and phys:IsMotionEnabled()) then
+				timer.Remove(timerName)
+				return
+			end
+			
+			-- Calculate step distance based on current velocity
+			local stepDistance = currentVelocity * tickRate
+			local currentPos = projectile:GetPos()
+			local targetPos = (currentPos + launchDir * stepDistance) + gravity
+			
+			-- Trace to check for obstructions
+			local tr = util.TraceHull({
+				start = currentPos,
+				endpos = targetPos,
+				mins = -hullSize * 0.5 + projectileCenter,
+				maxs = hullSize * 0.5 + projectileCenter,
+				filter = {self, projectile}
+			})
+			
+			if tr.Hit then
+				debugoverlay.Cross(currentPos, 10, 5, Color(255, 0, 0), true)
+				debugoverlay.Line(currentPos, tr.HitPos, 5, Color(255, 0, 0), true)
+				debugoverlay.Box(tr.HitPos, -hullSize * 0.5, hullSize * 0.5, 5, Color(255, 0, 0))
+				if hadMotion then
+					phys:EnableMotion(true)
+				end
+				phys:SetVelocity(launchDir * math.max(currentVelocity, maxVelLimit))
+				timer.Remove(timerName)
+				return
+			end
+			
+			-- Update position
+			projectile:SetPos(targetPos)
+			debugoverlay.Line(currentPos, targetPos, 5, Color(0, 204, 255), true)
+			
+			-- Reduce velocity towards max velocity limit using drag-based decay
+			if currentVelocity > maxVelLimit then
+				if dragDecayFactor then
+					-- Apply drag decay: v_new = v_old * e^(-drag * dt / m)
+					currentVelocity = currentVelocity * dragDecayFactor
+				elseif linearReductionPerTick then
+					-- Fallback: linear reduction when drag is very low or zero
+					currentVelocity = math.max(currentVelocity - linearReductionPerTick, maxVelLimit)
+				end
+				-- Ensure velocity doesn't go below max limit
+				currentVelocity = math.max(currentVelocity, maxVelLimit)
+				phys:SetVelocity(launchDir * currentVelocity)
+			end
+			
+			-- Check if we've reached max velocity threshold
+			if currentVelocity <= maxVelLimit then
+				-- Velocity reduced to max, hand off to physics
+				if hadMotion then
+					phys:EnableMotion(true)
+				end
+				phys:SetVelocity(launchDir * currentVelocity)
+				timer.Remove(timerName)
+				return
+			end
+		end)
+	end
+
 	function ENT:LaunchProjectile(unload, ply)
 		local Time = CurTime()
 		if not(unload) and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
@@ -679,18 +785,17 @@ if SERVER then
 		LaunchedProjectile:SetAngles(LaunchAngle)
 		
 		-- Calculate the offset needed to align physics centers
-		local CannonCenter = self:LocalToWorld(self:OBBCenter())
-		local ProjectileCenter = LaunchedProjectile:LocalToWorld(LaunchedProjectile:OBBCenter())
-		local CenterOffset = CannonCenter - ProjectileCenter
+		local CannonBarrelCenter = self:LocalToWorld(self:OBBCenter()) + Up * (self.BarrelLength)
+		local ProjectileCenter = LaunchedProjectile:LocalToWorld(LaunchedProjectile:OBBCenter()) + Up * (Specs.LaunchOffset or 0)
 		
 		-- Apply the center alignment offset plus the launch offset
-		local LaunchPos = SelfPos + CenterOffset + Up * (self.BarrelLength + (Specs.LaunchOffset or 0))
+		local LaunchPos = SelfPos + (CannonBarrelCenter - ProjectileCenter)
 		
 		-- Set the final position
 		LaunchedProjectile:SetPos(LaunchPos)
 		local Nocollider = constraint.NoCollide(self, LaunchedProjectile, 0, 0, true)
 	
-		timer.Simple(0, function()
+		timer.Simple(0.01, function()
 			if not IsValid(LaunchedProjectile) or not IsValid(self) then return end
 			local LaunchPhys = LaunchedProjectile:GetPhysicsObject()
 			LaunchPhys:SetVelocity(self:GetPhysicsObject():GetVelocity())
@@ -716,9 +821,6 @@ if SERVER then
 								LaunchedProjectile[Specs.ArmMethod](LaunchedProjectile)
 							end
 						end)
-					elseif LaunchedProjectile.Launch then
-						LaunchedProjectile:SetState(JMod.EZ_STATE_ON)
-						LaunchedProjectile:Launch(ply)
 					elseif LaunchedProjectile.Arm then
 						timer.Simple(Specs.ArmDelay or 0, function()
 							if IsValid(LaunchedProjectile) then
@@ -736,23 +838,16 @@ if SERVER then
 
 					return 
 				end
-				
-				local MaxForce = self.MaxPropellantForce
-				local TargetPropellant = self.TargetPropellant
-				local TargetPercentage = self.TargetPercentage
-				
-				-- Calculate the curve parameters
-				-- Using formula: force = MaxForce * (1 - e^(-propellant * k))
-				-- Where k is calculated to give us 80% at 40 propellant
-				local k = -math.log(1 - TargetPercentage) / TargetPropellant
-				local CalculatedForce = MaxForce * (1 - math.exp(-self.CurrentPropellantPerShot * k))
-				
+
+				-- Calculate force using centralized force curve function
+				local CalculatedForce = self:CalculateForceCurve(self.CurrentPropellantPerShot)
+
 				-- Apply the calculated force with projectile-specific multipliers
 				local Spread = self.Spread or 0.01
 				local LaunchDir = (Up + Right * math.Rand(-1, 1) * Spread + Forward * math.Rand(-1, 1) * Spread):GetNormalized()
 				local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1)
 
-				-- Calculate if projectile will be supersonic
+				-- Calculate if projectile will be 'supersonic'
 				local ProjectileMass = LaunchPhys:GetMass()
 				local LaunchForceLength = LaunchForce:Length()
 				local LaunchVelocity = LaunchForceLength / ProjectileMass
@@ -761,44 +856,37 @@ if SERVER then
 				local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
 				local MaxForce = ProjectileMass * MaxVelocity
 				local OverflowForce = LaunchForceLength - MaxForce
-				local SpeedOfSound = 13500 -- 343 m/s in HU
-				local IsSupersonic = LaunchVelocity >= SpeedOfSound
+				local IsSupersonic = LaunchVelocity >= 13500 -- 343 m/s in HU
 				
 				if OverflowForce > 0 then
-					--local OverflowBursts = math.min(math.ceil(OverflowForce / (MaxForce * 0.2)), 20)
+					-- Get MaxPropSize dimensions (y and z are the two smallest for hull trace)
+					local HullSize = Vector(self.MaxPropSize.y, self.MaxPropSize.z, self.MaxPropSize.z)
 
-					--[[timer.Simple(0.1, function()
-						timer.Create("OverflowForce"..LaunchedProjectile:EntIndex(), .5, OverflowBursts, function()
-							OverflowBursts = OverflowBursts - 1
-							if IsValid(LaunchedProjectile) and IsValid(LaunchPhys) and LaunchPhys:IsMotionEnabled() then
-								local ForceDir = (LaunchPhys:GetVelocity() + LaunchForce):GetNormalized()
-								local ForceToApply = math.min(OverflowForce, MaxVelocity)
-								print("Applying force: " .. ForceToApply .. " to " .. tostring(LaunchedProjectile))
-								LaunchPhys:ApplyForceCenter(ForceDir * ForceToApply)
-								OverflowForce = OverflowForce - ForceToApply
-								if OverflowForce <= 0 then
-									timer.Remove("OverflowForce"..LaunchedProjectile:EntIndex())
-								end
-								if OverflowBursts <= 0 then
-								end
-							else
-								timer.Remove("OverflowForce"..LaunchedProjectile:EntIndex())
-							end
-						end)
-					end)--]]
-
-					-- Calculate the amount of time it would take before the projectile would get back to max velocity with 1 drag
-					local TimeToMaxVelocity = (LaunchVelocity - MaxVelocity) / MaxVelocity
-					if (TimeToMaxVelocity > 0) and (LaunchPhys:IsGravityEnabled()) then
-						LaunchPhys:EnableGravity(false)
-						timer.Simple(TimeToMaxVelocity, function()
-							if IsValid(LaunchPhys) then
-								LaunchPhys:EnableGravity(true)
-							end
-						end)
+					-- Ensure we don't teleport into the cannon
+					local MinSafeDistance = self.MaxPropSize.x * 2
+					
+					-- Initial trace check to ensure cannon isn't obstructed before starting teleport
+					local initialTr = util.TraceHull({
+						start = CannonBarrelCenter,
+						endpos = CannonBarrelCenter + LaunchDir * MinSafeDistance,
+						mins = -HullSize * 0.5,
+						maxs = HullSize * 0.5,
+						filter = {self, LaunchedProjectile}
+					})
+					
+					if not initialTr.Hit then
+						-- Disable motion and prevent initial movement since we're teleporting
+						local HadMotion = LaunchPhys:IsMotionEnabled()
+						if HadMotion then
+							LaunchPhys:EnableMotion(false)
+						end
+						
+						-- Create self-contained step-based tracker
+						self:CreateProjectileTracker(LaunchedProjectile, LaunchPhys, LaunchDir, HadMotion, LaunchVelocity, MaxVelocity, HullSize)
 					end
+					debugoverlay.Cross(CannonBarrelCenter, 10, 5, Color(229, 255, 0), true)
+					--debugoverlay.Box(initialTr.HitPos, -HullSize * 0.5, HullSize * 0.5, 5, Color(229, 255, 0))
 				end
-
 				LaunchPhys:ApplyForceCenter(LaunchForce)
 				self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
@@ -809,7 +897,7 @@ if SERVER then
 				if self.HasRocketMotor and not Specs.NoRocketMotor then
 					-- Spawn and parent a rocket motor to the projectile
 					local RocketMotor = ents.Create("ent_jack_gmod_ezrocketmotor")
-					RocketMotor:SetPos(CannonCenter)
+					RocketMotor:SetPos(CannonBarrelCenter)
 					RocketMotor:SetAngles(self:GetAngles())
 					RocketMotor:Spawn()
 					RocketMotor:Activate()
@@ -831,7 +919,7 @@ if SERVER then
 		-- Clear the loaded projectile after launching
 		--self.LoadedProjectileType = nil
 		--self.PropModel = nil
-		--self.EZlaunchableWeaponLoadTime = nil
+		self.EZlaunchableWeaponLoadTime = CurTime()
 		
 		-- Delay state sync to allow projectile to launch first
 		timer.Simple(0.5, function()
@@ -979,6 +1067,7 @@ elseif CLIENT then
 		self.PropModel = nil
 		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
 		self.ProjectileMass = 0
+		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
 		
 		-- Custom model initialization
 		self:DrawShadow(true)
