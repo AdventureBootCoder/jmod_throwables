@@ -219,7 +219,7 @@ function ENT:CalculateEstimatedRange()
 	
 	while timeElapsed < maxTime do
 		-- Calculate next position and velocity using trajectory function
-		local nextPos, nextVel = ABoot_CalculateProjectileTrajectory(
+		local nextPos, nextVel = JMod.CalculateProjectileTrajectory(
 			currentPos,
 			currentVel,
 			timeStep,
@@ -697,7 +697,7 @@ if SERVER then
 			end
 			
 			-- Use the unified trajectory calculation function on the center position
-			local nextCenterPos, nextVelVector = ABoot_CalculateProjectileTrajectory(
+			local nextCenterPos, nextVelVector = JMod.CalculateProjectileTrajectory(
 				currentCenterPos,
 				currentVelVector,
 				tickRate,
