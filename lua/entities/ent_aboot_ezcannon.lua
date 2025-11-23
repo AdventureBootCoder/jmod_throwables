@@ -180,58 +180,102 @@ function ENT:CalculateEstimatedRange()
 	-- Apply projectile-specific multipliers
 	local LaunchForce = CalculatedForce * (Specs.ForceMult or 1)
 	
-	-- Calculate initial velocity (F = ma, so v = F/m)
-	local InitialVelocity = LaunchForce / self.ProjectileMass
+	-- Calculate initial velocity magnitude (F = ma, so v = F/m)
+	local InitialVelocityMag = LaunchForce / self.ProjectileMass
 	
-	-- Check if velocity exceeds server max velocity
-	local MaxVelocity = GetConVar("sv_maxvelocity"):GetFloat()
-	local OverChargeDistance = ((InitialVelocity - MaxVelocity) / MaxVelocity) * InitialVelocity
-	if InitialVelocity > MaxVelocity then
-		InitialVelocity = MaxVelocity
-	end
-	
-	-- Get the cannon's current Up vector to determine launch angle
+	-- Get the cannon's current Up vector to determine launch direction
 	local CannonUp = self:GetUp()
-	-- Calculate the angle between the Up vector and the world's Up vector (0,0,1)
-	-- This gives us the actual pitch angle relative to horizontal
+	local LaunchDir = CannonUp:GetNormalized()
+	
+	-- Calculate initial velocity vector
+	local InitialVelocity = LaunchDir * InitialVelocityMag
+	
+	-- Get launch angle for display
 	local WorldUp = Vector(0, 0, 1)
 	local DotProduct = CannonUp:Dot(WorldUp)
 	local RawAngle = math.deg(math.acos(math.Clamp(DotProduct, -1, 1)))
-	
-	-- Convert to launch angle
-	local LaunchAngle
+	local LaunchAngle = 0
 	if RawAngle <= 90 then
-		-- Cannon pointing up or level
 		LaunchAngle = 90 - RawAngle
-	else
-		-- Cannon pointing down - set to 0 for no range
-		LaunchAngle = 0
 	end
 	
-	local Gravity = GetConVar("sv_gravity"):GetFloat() -- Source engine gravity in HU/s^2
-	local EstimatedRange = 0
-
-	if OverChargeDistance > 0 then
-		EstimatedRange = OverChargeDistance
-	end
-
-	if LaunchAngle > 0.1 then
-		local AngleRad = math.rad(LaunchAngle)
-		local Sin2Theta = math.sin(2 * AngleRad)
-		EstimatedRange = EstimatedRange + ((InitialVelocity * InitialVelocity * Sin2Theta) / Gravity)
+	-- Get mass and drag for trajectory calculation
+	-- Use the stored projectile mass, and a reasonable default drag value
+	-- Most physics objects in GMod have drag around 0-0.1, we'll use a small default
+	local mass = self.ProjectileMass
+	local drag = 0.01 -- Default drag coefficient (can be adjusted per projectile type if needed)
+	
+	-- Starting position (cannon barrel)
+	local startPos = self:GetPos() + CannonUp * self.BarrelLength
+	
+	-- Simulate trajectory until projectile hits ground or stops moving forward
+	local currentPos = startPos
+	local currentVel = InitialVelocity
+	local timeStep = 0.1 -- 100ms steps
+	local maxTime = 60 -- Maximum simulation time (60 seconds)
+	local peakHeight = startPos.z -- Track the highest point reached
+	local hasReachedPeak = false
+	local timeElapsed = 0
+	
+	while timeElapsed < maxTime do
+		-- Calculate next position and velocity using trajectory function
+		local nextPos, nextVel = ABoot_CalculateProjectileTrajectory(
+			currentPos,
+			currentVel,
+			timeStep,
+			nil, -- No entity, use mass/drag directly
+			mass,
+			drag
+		)
+		
+		-- Check if projectile has hit the ground
+		local currentHeight = nextPos.z
+		local horizontalPos = Vector(nextPos.x, nextPos.y, 0)
+		
+		-- Track peak height
+		if currentHeight > peakHeight then
+			peakHeight = currentHeight
+		elseif not hasReachedPeak and currentHeight < peakHeight then
+			-- We've passed the peak and are now descending
+			hasReachedPeak = true
+		end
+		
+		-- If we've reached peak and are descending below starting height, we've hit ground
+		-- (Assuming ground is at or near the starting height)
+		if hasReachedPeak and currentHeight <= startPos.z and nextVel.z <= 0 then
+			-- Projectile has landed
+			local horizontalRange = Vector(startPos.x, startPos.y, 0):Distance(horizontalPos)
+			
+			-- Convert to meters (1 Source unit = 0.01905 meters)
+			local MetersPerUnit = 0.01905
+			local EstimatedRangeMeters = horizontalRange * MetersPerUnit
+			
+			return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
+		end
+		
+		-- If horizontal velocity is very low and we're moving downward, projectile has essentially stopped
+		local horizontalVel = Vector(nextVel.x, nextVel.y, 0):Length()
+		if horizontalVel < 10 and nextVel.z < 0 then
+			local horizontalRange = Vector(startPos.x, startPos.y, 0):Distance(horizontalPos)
+			local MetersPerUnit = 0.01905
+			local EstimatedRangeMeters = horizontalRange * MetersPerUnit
+			return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
+		end
+		
+		-- Update for next iteration
+		currentPos = nextPos
+		currentVel = nextVel
+		lastHeight = currentHeight
+		lastHorizontalPos = horizontalPos
+		timeElapsed = timeElapsed + timeStep
 	end
 	
-	-- Convert to meters (1 Source unit = 0.01905 meters)
+	-- If we've exceeded max time, return the final position
+	local horizontalPos = Vector(currentPos.x, currentPos.y, 0)
+	local horizontalRange = Vector(startPos.x, startPos.y, 0):Distance(horizontalPos)
 	local MetersPerUnit = 0.01905
-	local EstimatedRangeMeters = EstimatedRange * MetersPerUnit
-
-	-- Figure out the location of the projectile at the end of its flight
-	local FlatDir = self:GetUp()
-	FlatDir.z = 0
-	local EndPos = self:GetPos() + (FlatDir:GetNormalized() * EstimatedRange)
-	
-	-- Round to nearest meter for display
-	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), EndPos
+	local EstimatedRangeMeters = horizontalRange * MetersPerUnit
+	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), currentPos
 end
 
 if SERVER then
@@ -635,34 +679,15 @@ if SERVER then
 		-- Get server tick rate for consistent step timing
 		local tickRate = engine.TickInterval()
 		
-		-- Initialize velocity tracking
-		local currentVelocity = initialVelocity
+		-- Initialize velocity tracking (as a vector)
+		local currentVelVector = launchDir * initialVelocity
 		
-		-- Get projectile drag coefficient for accurate velocity reduction
-		local drag = phys:GetSpeedDamping() or 0
-		local mass = phys:GetMass()
+		-- Get projectile center offset from origin (local space)
+		local projectileCenterLocal = projectile:OBBCenter()
 		
-		-- Calculate velocity decay factor based on drag
-		-- Drag force: F = -drag * v
-		-- Acceleration: a = F/m = -drag * v / m
-		-- Velocity decay: v(t) = v0 * e^(-drag * t / m)
-		-- For discrete steps: v_new = v_old * e^(-drag * tickRate / mass)
-		local dragDecayFactor
-		local linearReductionPerTick = nil
-		if drag > 0.001 then
-			-- Use exponential decay based on drag
-			dragDecayFactor = math.exp(-drag * tickRate / math.max(mass, 0.1))
-		else
-			-- Fallback: if drag is very low or zero, use linear reduction
-			-- Calculate how many steps it would take to reduce to max velocity
-			local velocityDiff = initialVelocity - maxVelLimit
-			local estimatedSteps = math.max(1, math.ceil(velocityDiff / (maxVelLimit * tickRate)))
-			linearReductionPerTick = velocityDiff / estimatedSteps
-			dragDecayFactor = nil -- Signal to use linear reduction
-		end
-		
-		local projectileCenter = projectile:OBBCenter()
-		local gravity = physenv.GetGravity() * projectile:GetGravity()
+		-- Track center position (not origin position) to account for origin offset
+		-- Use LocalToWorld to convert local center to world space (accounts for position and rotation)
+		local currentCenterPos = projectile:LocalToWorld(projectileCenterLocal)
 		
 		-- Step-based teleportation and velocity reduction timer
 		timer.Create(timerName, tickRate, 0, function()
@@ -671,60 +696,95 @@ if SERVER then
 				return
 			end
 			
-			-- Calculate step distance based on current velocity
-			local stepDistance = currentVelocity * tickRate
-			local currentPos = projectile:GetPos()
-			local targetPos = (currentPos + launchDir * stepDistance) + gravity
+			-- Use the unified trajectory calculation function on the center position
+			local nextCenterPos, nextVelVector = ABoot_CalculateProjectileTrajectory(
+				currentCenterPos,
+				currentVelVector,
+				tickRate,
+				projectile
+			)
 			
-			-- Trace to check for obstructions
+			-- Get current velocity magnitude for limit checking
+			local currentVelocity = currentVelVector:Length()
+			
+			-- Trace from center to center to check for obstructions
+			-- Hull bounds are centered at 0 since we're tracing from the center
 			local tr = util.TraceHull({
-				start = currentPos,
-				endpos = targetPos,
-				mins = -hullSize * 0.5 + projectileCenter,
-				maxs = hullSize * 0.5 + projectileCenter,
+				start = currentCenterPos,
+				endpos = nextCenterPos,
+				mins = -hullSize * 0.5,
+				maxs = hullSize * 0.5,
 				filter = {self, projectile}
 			})
 			
 			if tr.Hit then
-				debugoverlay.Cross(currentPos, 10, 5, Color(255, 0, 0), true)
-				debugoverlay.Line(currentPos, tr.HitPos, 5, Color(255, 0, 0), true)
-				debugoverlay.Box(tr.HitPos, -hullSize * 0.5, hullSize * 0.5, 5, Color(255, 0, 0))
+				-- Hit detected at center position
+				local hitCenterPos = tr.HitPos
+				
+				-- Calculate current center offset in world space
+				local currentProjectileCenter = projectile:LocalToWorld(projectileCenterLocal)
+				local currentProjectilePos = projectile:GetPos()
+				local centerOffsetWorld = currentProjectileCenter - currentProjectilePos
+				
+				-- Set entity position so its center is at the hit position
+				local hitOriginPos = hitCenterPos - centerOffsetWorld
+				
+				debugoverlay.Cross(hitCenterPos, 10, 5, Color(255, 0, 0), true)
+				debugoverlay.Line(currentCenterPos, hitCenterPos, 5, Color(255, 0, 0), true)
+				debugoverlay.Box(hitCenterPos, -hullSize * 0.5, hullSize * 0.5, 5, Color(255, 0, 0))
+				
+				projectile:SetPos(hitOriginPos)
+				
 				if hadMotion then
 					phys:EnableMotion(true)
 				end
-				phys:SetVelocity(launchDir * math.max(currentVelocity, maxVelLimit))
+				-- Use the calculated velocity, but ensure it's at least maxVelLimit
+				local finalVel = nextVelVector:Length()
+				if finalVel < maxVelLimit then
+					phys:SetVelocity(launchDir * maxVelLimit)
+				else
+					phys:SetVelocity(nextVelVector)
+				end
 				timer.Remove(timerName)
 				return
 			end
 			
-			-- Update position
-			projectile:SetPos(targetPos)
-			debugoverlay.Line(currentPos, targetPos, 5, Color(0, 204, 255), true)
+			-- Calculate origin position from center position
+			-- Get current center offset in world space (accounts for rotation)
+			local currentProjectileCenter = projectile:LocalToWorld(projectileCenterLocal)
+			local currentProjectilePos = projectile:GetPos()
+			local centerOffsetWorld = currentProjectileCenter - currentProjectilePos
 			
-			-- Reduce velocity towards max velocity limit using drag-based decay
-			if currentVelocity > maxVelLimit then
-				if dragDecayFactor then
-					-- Apply drag decay: v_new = v_old * e^(-drag * dt / m)
-					currentVelocity = currentVelocity * dragDecayFactor
-				elseif linearReductionPerTick then
-					-- Fallback: linear reduction when drag is very low or zero
-					currentVelocity = math.max(currentVelocity - linearReductionPerTick, maxVelLimit)
-				end
-				-- Ensure velocity doesn't go below max limit
-				currentVelocity = math.max(currentVelocity, maxVelLimit)
-				phys:SetVelocity(launchDir * currentVelocity)
-			end
+			-- Set origin position so center ends up at nextCenterPos
+			local nextOriginPos = nextCenterPos - centerOffsetWorld
 			
-			-- Check if we've reached max velocity threshold
-			if currentVelocity <= maxVelLimit then
+			-- Update position (set origin, which will place center at nextCenterPos)
+			projectile:SetPos(nextOriginPos)
+			
+			-- Update state for next iteration
+			-- Recalculate center position after setting position (accounts for any rotation changes)
+			currentCenterPos = projectile:LocalToWorld(projectileCenterLocal)
+			currentVelVector = nextVelVector
+			debugoverlay.Line(currentCenterPos, nextCenterPos, 5, Color(0, 204, 255), true)
+			
+			-- Check if velocity has dropped below max limit
+			local nextVelocity = nextVelVector:Length()
+			
+			if nextVelocity <= maxVelLimit then
 				-- Velocity reduced to max, hand off to physics
 				if hadMotion then
 					phys:EnableMotion(true)
 				end
-				phys:SetVelocity(launchDir * currentVelocity)
+				-- Normalize direction and apply max velocity
+				local finalDir = nextVelVector:GetNormalized()
+				phys:SetVelocity(finalDir * maxVelLimit)
 				timer.Remove(timerName)
 				return
 			end
+			
+			-- Update state for next iteration (track center position)
+			currentCenterPos = nextCenterPos
+			currentVelVector = nextVelVector
 		end)
 	end
 
