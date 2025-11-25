@@ -54,102 +54,125 @@ ENT.ProjectileSpecs = nil
 local ProjectileSpecs = {
 	["prop_physics"] = {
 		UsePropModel = true,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "Prop Physics"
 	},
 	["ent_jack_gmod_ezincendiarybomb"] = {
 		ArmDelay = .1,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "Incendiary Bomb"
 	},
 	["ent_jack_gmod_ezthermobaricbomb"] = {
 		ArmDelay = .1,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "Thermobaric Bomb"
 	},
 	["ent_jack_gmod_ezclusterbomb"] = {
 		ArmDelay = .1,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "Cluster Bomb"
 	},
 	["ent_jack_gmod_ezsmallbomb"] = {
 		ArmDelay = 1,
-		DefaultMass = 80
+		DefaultMass = 80,
+		DisplayName = "Small Bomb"
 	},
 	["ent_jack_gmod_ezhebomb"] = {
 		ArmDelay = .2,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "HE Bomb"
 	},
 	["ent_jack_gmod_ezfumigator"] = {
 		ArmDelay = .5,
 		ArmMethod = "Fume",
 		RightCorrection = -90,
-		DefaultMass = 20
+		DefaultMass = 20,
+		DisplayName = "Fumigator"
 	},
 	["ent_jack_gmod_ezflareprojectile"] = {
 		ForceMult = .1,
-		DefaultMass = 10
+		DefaultMass = 10,
+		DisplayName = "Flare Projectile"
 	},
 	["ent_jack_gmod_eznuke_small"] = {	
 		ArmDelay = 1,
-		DefaultMass = 100
+		DefaultMass = 100,
+		DisplayName = "Small Nuke"
 	},
 	["ent_jack_gmod_ezcriticalityweapon"] = {
 		ArmDelay = 3,
 		ArmMethod = "Detonate",
 		ForceMult = 2,
-		DefaultMass = 150
+		DefaultMass = 150,
+		DisplayName = "Criticality Weapon"
 	},
 	["ent_jack_gmod_ezpowderkeg"] = {
 		ArmDelay = .2,
 		ArmMethod = "Detonate",
-		DefaultMass = 50
+		DefaultMass = 50,
+		DisplayName = "Powder Keg"
 	},
 	["ent_aboot_ezcannon_shot"] = {
 		ArmDelay = .1,
-		DefaultMass = 50
+		DefaultMass = 50,
+		DisplayName = "Cannon Shot"
 	},
 	["ent_aboot_ezcannon_shot_plasma"] = {
 		ArmDelay = .1,
 		ForceMult = 2,
-		DefaultMass = .1
+		DefaultMass = .1,
+		DisplayName = "Plasma Shot"
 	},
 	["ent_aboot_ezcannon_shot_cannister"] = {
 		ArmDelay = .05,
-		DefaultMass = 50
+		DefaultMass = 50,
+		DisplayName = "Cannister Shot"
 	},
 	["ent_aboot_ezcannon_shot_angler"] = {
 		ArmDelay = .1,
 		Angles = Angle(0, 90, 0),
-		DefaultMass = 50
+		DefaultMass = 50,
+		DisplayName = "Angler Shot"
 	},
 	["ent_aboot_ezcannon_shot_ceramic"] = {
 		ArmDelay = .1,
-		DefaultMass = 35
+		DefaultMass = 35,
+		DisplayName = "Ceramic Shot"
 	},
 	["ent_aboot_ezcannon_shot_copper"] = {
 		ArmDelay = .1,
-		DefaultMass = 55
+		DefaultMass = 55,
+		DisplayName = "Copper Shot"
 	},
 	["ent_aboot_ezcannon_shot_uranium"] = {
 		ArmDelay = .1,
-		DefaultMass = 75
+		DefaultMass = 75,
+		DisplayName = "Uranium Shot"
 	},
 	["ent_aboot_ezcannon_shot_silver"] = {
 		ArmDelay = .1,
-		DefaultMass = 60
+		DefaultMass = 60,
+		DisplayName = "Silver Shot"
 	},
 	["ent_aboot_ezcannon_shot_gold"] = {
 		ArmDelay = .1,
-		DefaultMass = 65
+		DefaultMass = 65,
+		DisplayName = "Gold Shot"
 	},
 	["ent_aboot_ezcannon_shot_platinum"] = {
 		ArmDelay = .1,
-		DefaultMass = 70
+		DefaultMass = 70,
+		DisplayName = "Platinum Shot"
 	},
 	["ent_aboot_ezcannon_shot_rubber"] = {
 		ArmDelay = .1,
-		DefaultMass = 30
+		DefaultMass = 30,
+		DisplayName = "Rubber Shot"
 	},
 	["ent_aboot_ezcannon_shot_tungsten"] = {
 		ArmDelay = .1,
-		DefaultMass = 80
+		DefaultMass = 80,
+		DisplayName = "Tungsten Shot"
 	}
 }
 
@@ -250,7 +273,7 @@ function ENT:CalculateEstimatedRange()
 			local MetersPerUnit = 0.01905
 			local EstimatedRangeMeters = horizontalRange * MetersPerUnit
 			
-			return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
+			return math.floor(horizontalRange), math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
 		end
 		
 		-- If horizontal velocity is very low and we're moving downward, projectile has essentially stopped
@@ -259,7 +282,7 @@ function ENT:CalculateEstimatedRange()
 			local horizontalRange = Vector(startPos.x, startPos.y, 0):Distance(horizontalPos)
 			local MetersPerUnit = 0.01905
 			local EstimatedRangeMeters = horizontalRange * MetersPerUnit
-			return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
+			return math.floor(horizontalRange), math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), nextPos
 		end
 		
 		-- Update for next iteration
@@ -275,7 +298,7 @@ function ENT:CalculateEstimatedRange()
 	local horizontalRange = Vector(startPos.x, startPos.y, 0):Distance(horizontalPos)
 	local MetersPerUnit = 0.01905
 	local EstimatedRangeMeters = horizontalRange * MetersPerUnit
-	return math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), currentPos
+	return math.floor(horizontalRange), math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), currentPos
 end
 
 if SERVER then
@@ -318,10 +341,13 @@ if SERVER then
 		self.EstimatedRange = 0
 		self.LastRangeCalculation = 0
 		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
+		self.DesiredProjectileClass = self.DesiredProjectileClass or ""
+		self:SetDesiredProjectileClass(self.DesiredProjectileClass)
+		self.IsAutoLoading = self.IsAutoLoading or true
 		---
 		if istable(WireLib) then
-			self.Inputs = WireLib.CreateInputs(self, {"Launch [NORMAL]", "Unload [NORMAL]", "PropellantPerShot [NORMAL]", "CalculateRange [NORMAL]"}, {"Fires the loaded Projectile", "Unloads Projectile", "Sets the amount of propellant used per shot (1-100)", "Triggers range calculation update"})
-			self.Outputs = WireLib.CreateOutputs(self, {"LoadedProjectile [STRING]", "IsLoaded [NORMAL]", "Propellant [NORMAL]", "PropModel [STRING]", "CurrentPropellantPerShot [NORMAL]", "EstimatedRange [NORMAL]", "EstimatedRangeMeters [NORMAL]", "LaunchAngle [NORMAL]"}, {"The currently loaded Projectile type", "Whether a projectile is loaded (1) or not (0)", "Current propellant amount", "Model name of loaded prop (if applicable)", "Current propellant amount per shot", "Estimated range in units", "Estimated range in meters", "Current launch angle in degrees"})
+			self.Inputs = WireLib.CreateInputs(self, {"Launch [NORMAL]", "Unload [NORMAL]", "PropellantPerShot [NORMAL]", "CalculateRange [NORMAL]", "DesiredProjectileClass [STRING]", "AutoLoading [NORMAL]"}, {"Fires the loaded Projectile", "Unloads Projectile", "Sets the amount of propellant used per shot (1-100)", "Triggers range calculation update", "Sets the desired projectile class for autoloading", "Enable (1) or disable (0) autoloading"})
+			self.Outputs = WireLib.CreateOutputs(self, {"LoadedProjectile [STRING]", "IsLoaded [NORMAL]", "Propellant [NORMAL]", "PropModel [STRING]", "CurrentPropellantPerShot [NORMAL]", "EstimatedRange [NORMAL]", "EstimatedRangeMeters [NORMAL]", "LaunchAngle [NORMAL]", "DesiredProjectileClass [STRING]", "AutoLoading [NORMAL]"}, {"The currently loaded Projectile type", "Whether a projectile is loaded (1) or not (0)", "Current propellant amount", "Model name of loaded prop (if applicable)", "Current propellant amount per shot", "Estimated range in units", "Estimated range in meters", "Current launch angle in degrees", "The desired projectile class for autoloading", "Whether autoloading is enabled (1) or disabled (0)"})
 		end
 		
 		-- Sync initial state to clients
@@ -335,7 +361,7 @@ if SERVER then
 	function ENT:UpdateWireOutputs()
 		if istable(WireLib) then
 			-- Calculate current range and angle
-			local estimatedRange, launchAngle = self:CalculateEstimatedRange()
+			local estimatedRange, estimatedRangeMeters, launchAngle = self:CalculateEstimatedRange()
 			
 			WireLib.TriggerOutput(self, "IsLoaded", self.LoadedProjectileType and 1 or 0)
 			WireLib.TriggerOutput(self, "LoadedProjectile", self.LoadedProjectileType or "")
@@ -343,8 +369,10 @@ if SERVER then
 			WireLib.TriggerOutput(self, "PropModel", self.PropModel or "")
 			WireLib.TriggerOutput(self, "CurrentPropellantPerShot", self.CurrentPropellantPerShot or 0)
 			WireLib.TriggerOutput(self, "EstimatedRange", estimatedRange or 0)
-			WireLib.TriggerOutput(self, "EstimatedRangeMeters", estimatedRange or 0)
+			WireLib.TriggerOutput(self, "EstimatedRangeMeters", estimatedRangeMeters or 0)
 			WireLib.TriggerOutput(self, "LaunchAngle", launchAngle or 0)
+			WireLib.TriggerOutput(self, "DesiredProjectileClass", self:GetDesiredProjectileClass() or "")
+			WireLib.TriggerOutput(self, "AutoLoading", self:GetIsAutoLoading() and 1 or 0)
 		end
 	end
 	
@@ -356,6 +384,8 @@ if SERVER then
 		net.WriteUInt(self.Propellant or 0, 8)
 		net.WriteUInt(self.CurrentPropellantPerShot or 20, 8)
 		net.WriteUInt(self.ProjectileMass or 0, 16) -- Send projectile mass instead of calculated range
+		net.WriteString(self:GetDesiredProjectileClass() or "")
+		net.WriteBool(self:GetIsAutoLoading() or false)
 		net.Broadcast()
 	end
 	
@@ -375,6 +405,15 @@ if SERVER then
 				self.LastRangeCalculation = currentTime
 				self:UpdateWireOutputs()
 			end
+		elseif iname == "DesiredProjectileClass" then
+			if isstring(value) then
+				self:SetDesiredProjectileClass(value)
+				self:SyncStateToClients()
+			end
+		elseif iname == "AutoLoading" then
+			self:SetIsAutoLoading(value > 0)
+			self:UpdateWireOutputs()
+			self:SyncStateToClients()
 		end
 	end
 
@@ -479,7 +518,7 @@ if SERVER then
 		if not self.LoadedProjectileType or self.LoadedProjectileType == "" then
 			-- Check for antimatter loading and set plasma projectile
 			for shotType, shot in pairs(self.ResourcesToShot) do
-				if typ == shotType and amt >= shot[2] then
+				if typ == shotType and amt >= shot[2] and self.ProjectileSpecs[typ] then
 					self:SetProjectileType(shot[1])
 
 					return shot[2]
@@ -504,6 +543,45 @@ if SERVER then
 		return 0
 	end
 
+	function ENT:GetDesiredProjectileClass()
+		return self.DesiredProjectileClass
+	end
+
+	function ENT:SetDesiredProjectileClass(projectileClass)
+		if not isstring(projectileClass) then 
+			self.DesiredProjectileClass = ""
+			self:UpdateWireOutputs()
+			return 
+		end
+		if projectileClass == "" then
+			self.DesiredProjectileClass = ""
+			self:UpdateWireOutputs()
+			return
+		end
+		if not self.ProjectileSpecs[projectileClass] then return end
+
+		self.DesiredProjectileClass = projectileClass
+		self:UpdateWireOutputs()
+	end
+
+	function ENT:GetIsAutoLoading()
+		return self.IsAutoLoading
+	end
+
+	function ENT:SetIsAutoLoading(isAutoLoading)
+		if not isbool(isAutoLoading) then return end
+
+		self.IsAutoLoading = isAutoLoading
+		self:UpdateWireOutputs()
+		self:SyncStateToClients()
+	end
+
+	function ENT:AutoLoadProjectile()
+		if not self.IsAutoLoading then return end
+
+		-- TODO: Implement auto loading by going through connected auto-loaders and finding the one with the projectile type we want, and then loading it.
+	end
+
 	function ENT:SetProjectileType(projectileType)
 		self.LoadedProjectileType = projectileType
 		self.EZlaunchableWeaponLoadTime = CurTime()
@@ -522,6 +600,21 @@ if SERVER then
 		self:EmitSound("snd_jack_metallicload.ogg", 65, 90)
 		self:UpdateWireOutputs()
 		self:SyncStateToClients()
+	end
+
+	function ENT:TryLoadProjectileClass(projectileClass)
+		if not isstring(projectileClass) then return false end
+
+		local Specs = self.ProjectileSpecs[projectileClass]
+		if not Specs then return false end
+
+		self:SetProjectileType(projectileClass)
+
+		return true
+	end
+
+	function ENT:GetLoadedProjectileType()
+		return self.LoadedProjectileType
 	end
 
 	function ENT:LoadProjectile(Projectile)
@@ -977,8 +1070,8 @@ if SERVER then
 			end
 		end)
 		-- Clear the loaded projectile after launching
-		--self.LoadedProjectileType = nil
-		--self.PropModel = nil
+		self.LoadedProjectileType = nil
+		self.PropModel = nil
 		self.EZlaunchableWeaponLoadTime = CurTime()
 		
 		-- Delay state sync to allow projectile to launch first
@@ -1102,6 +1195,8 @@ if SERVER then
 					net.WriteString(cannon.LoadedProjectileType or "")
 					net.WriteUInt(cannon.Propellant or 0, 8)
 					net.WriteUInt(cannon.CurrentPropellantPerShot or 20, 8)
+					net.WriteString(cannon:GetDesiredProjectileClass() or "")
+					net.WriteBool(cannon:GetIsAutoLoading() or false)
 				net.Send(ply)
 			end
 		elseif command == "fire" then
@@ -1116,6 +1211,13 @@ if SERVER then
 			-- Validate propellant value
 			cannon.CurrentPropellantPerShot = math.Clamp(propellant, 1, cannon.MaxPropellant or 100)
 			cannon:UpdateWireOutputs()
+		elseif command == "setdesiredprojectile" then
+			local projectileClass = net.ReadString()
+			cannon:SetDesiredProjectileClass(projectileClass)
+			cannon:SyncStateToClients()
+		elseif command == "setautoloading" then
+			local isAutoLoading = net.ReadBool()
+			cannon:SetIsAutoLoading(isAutoLoading)
 		end
 	end)
 
@@ -1128,6 +1230,7 @@ elseif CLIENT then
 		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
 		self.ProjectileMass = 0
 		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
+		self.IsAutoLoading = self.IsAutoLoading or true
 		
 		-- Custom model initialization
 		self:DrawShadow(true)
@@ -1216,6 +1319,8 @@ elseif CLIENT then
 			cannon.Propellant = net.ReadUInt(8)
 			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 			cannon.ProjectileMass = net.ReadUInt(16) -- Read projectile mass
+			cannon.DesiredProjectileClass = net.ReadString() or ""
+			cannon.IsAutoLoading = net.ReadBool()
 
 			if IsValid(cannon) then
 				JMod_EZCannon_OpenGUI(cannon)
@@ -1226,6 +1331,8 @@ elseif CLIENT then
 				cannon.Propellant = net.ReadUInt(8)
 				cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 				cannon.ProjectileMass = net.ReadUInt(16) -- Read projectile mass
+				cannon.DesiredProjectileClass = net.ReadString() or ""
+				cannon.IsAutoLoading = net.ReadBool()
 			end
 		end
 	end)
@@ -1235,7 +1342,7 @@ elseif CLIENT then
 		if not IsValid(cannon) then return end
 		
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(400, 350)
+		frame:SetSize(400, 450)
 		frame:Center()
 		frame:SetTitle("EZ Cannon Control")
 		frame:MakePopup()
@@ -1269,8 +1376,20 @@ elseif CLIENT then
 		local infoLabel = vgui.Create("DLabel", statusPanel)
 		infoLabel:SetPos(10, 10)
 		infoLabel:SetSize(160, 80)
+		
+		-- Get display name for loaded projectile
+		local loadedDisplayName = "None"
+		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
+			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[cannon.LoadedProjectileType]
+			if specs and specs.DisplayName then
+				loadedDisplayName = specs.DisplayName
+			else
+				loadedDisplayName = cannon.LoadedProjectileType
+			end
+		end
+		
 		infoLabel:SetText("Cannon Status:\n" .. 
-			"Loaded: " .. (cannon.LoadedProjectileType or "None") .. "\n" ..
+			"Loaded: " .. loadedDisplayName .. "\n" ..
 			"Propellant: " .. (cannon.Propellant or 0) .. "/" .. (cannon.MaxPropellant or 100))
 		infoLabel:SetWrap(true)
 		infoLabel:SetTextColor(Color(255, 255, 255, 200))
@@ -1290,14 +1409,14 @@ elseif CLIENT then
 		rangeLabel:SetSize(160, 80)
 		
 		-- Calculate range and angle on client side
-		local estimatedRange, currentLaunchAngle, EndPos = cannon:CalculateEstimatedRange()
+		local estimatedRange, estimatedRangeMeters, currentLaunchAngle, EndPos = cannon:CalculateEstimatedRange()
 		
 		local rangeText = "Range Info:\n"
 		local rangeColor = Color(255, 255, 255, 200)
 		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
 			-- Always show range if projectile is loaded, even if low
 			if estimatedRange and estimatedRange > 0 then
-				rangeText = rangeText .. "Estimated: " .. estimatedRange .. " m\n"
+				rangeText = rangeText .. "Estimated: " .. estimatedRangeMeters .. " m\n"
 				rangeText = rangeText .. "Launch Angle: " .. tostring(currentLaunchAngle) .. "°\n"
 				rangeText = rangeText .. "End Pos: " .. math.Round(math.ceil(EndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(EndPos.y * 100) / 10000)
 				-- Use JMod.GoodBadColor for dynamic color coding
@@ -1322,7 +1441,7 @@ elseif CLIENT then
 		-- Propellant control panel
 		local controlPanel = vgui.Create("DPanel", frame)
 		controlPanel:SetPos(10, 140)
-		controlPanel:SetSize(380, 100)
+		controlPanel:SetSize(380, 150)
 		
 		function controlPanel:Paint(w, h)
 			surface.SetDrawColor(0, 0, 0, 100)
@@ -1344,9 +1463,90 @@ elseif CLIENT then
 		slider:SetValue(cannon.CurrentPropellantPerShot or 20)
 		slider:SetDecimals(0)
 		
+		-- Desired projectile selector
+		local projectileLabel = vgui.Create("DLabel", controlPanel)
+		projectileLabel:SetPos(10, 70)
+		projectileLabel:SetSize(360, 20)
+		projectileLabel:SetText("Desired Projectile Type:")
+		projectileLabel:SetTextColor(Color(255, 255, 255, 200))
+		
+		local projectileCombo = vgui.Create("DComboBox", controlPanel)
+		projectileCombo:SetPos(10, 90)
+		projectileCombo:SetSize(360, 25)
+		
+		-- Get current display name for desired projectile
+		local currentDisplayName = "None"
+		if cannon.DesiredProjectileClass and cannon.DesiredProjectileClass ~= "" then
+			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[cannon.DesiredProjectileClass]
+			if specs and specs.DisplayName then
+				currentDisplayName = specs.DisplayName
+			else
+				currentDisplayName = cannon.DesiredProjectileClass
+			end
+		end
+		projectileCombo:SetValue(currentDisplayName)
+		
+		-- Add "None" option
+		projectileCombo:AddChoice("None", "")
+		
+		-- Add all valid projectile types
+		local projectileKeys = {}
+		for class, _ in pairs(cannon.ProjectileSpecs or ProjectileSpecs) do
+			table.insert(projectileKeys, class)
+		end
+		table.sort(projectileKeys)
+		
+		for _, class in ipairs(projectileKeys) do
+			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[class]
+			local displayName = (specs and specs.DisplayName) or class
+			projectileCombo:AddChoice(displayName, class)
+		end
+		
+		-- Customize the dropdown menu to add scrollbar
+		projectileCombo.OnMenuOpened = function(self, menu)
+			-- Set maximum height for the menu (will show scrollbar if content exceeds this)
+			menu:SetMaxHeight(200)
+		end
+		
+		projectileCombo.OnSelect = function(self, index, value, data)
+			if IsValid(cannon) then
+				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
+				net.Start("JMod_EZCannon_Command")
+					net.WriteEntity(cannon)
+					net.WriteString("setdesiredprojectile")
+					net.WriteString(data or "")
+				net.SendToServer()
+			end
+		end
+		
+		-- Autoloading toggle checkbox
+		local autoloadingCheckbox = vgui.Create("DCheckBoxLabel", controlPanel)
+		autoloadingCheckbox:SetPos(10, 120)
+		autoloadingCheckbox:SetSize(360, 25)
+		autoloadingCheckbox:SetText("Enable Autoloading")
+		autoloadingCheckbox:SetTextColor(Color(255, 255, 255, 200))
+		-- Ensure we have a boolean value (default to true if nil, matching server initialization)
+		local isAutoLoading = cannon.IsAutoLoading
+		if isAutoLoading == nil then
+			isAutoLoading = true -- Default value matches server initialization
+		end
+		autoloadingCheckbox:SetChecked(isAutoLoading)
+		autoloadingCheckbox.OnChange = function(self, val)
+			if IsValid(cannon) then
+				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
+				-- Update local variable immediately
+				cannon.IsAutoLoading = val
+				net.Start("JMod_EZCannon_Command")
+					net.WriteEntity(cannon)
+					net.WriteString("setautoloading")
+					net.WriteBool(val)
+				net.SendToServer()
+			end
+		end
+		
 		-- Button panel
 		local buttonPanel = vgui.Create("DPanel", frame)
-		buttonPanel:SetPos(10, 250)
+		buttonPanel:SetPos(10, 300)
 		buttonPanel:SetSize(380, 80)
 		
 		function buttonPanel:Paint(w, h)
@@ -1454,10 +1654,10 @@ elseif CLIENT then
 				net.SendToServer()
 				
 				-- Update range display in real-time
-				local newEstimatedRange, newCurrentLaunchAngle, newEndPos = cannon:CalculateEstimatedRange()
+				local newEstimatedRange, newEstimatedRangeMeters, newCurrentLaunchAngle, newEndPos = cannon:CalculateEstimatedRange()
 				if newEstimatedRange and newEstimatedRange > 0 then
 					local newRangeText = "Range Info:\n"
-					newRangeText = newRangeText .. "Estimated: " .. newEstimatedRange .. " m\n"
+					newRangeText = newRangeText .. "Estimated: " .. newEstimatedRangeMeters .. " m\n"
 					newRangeText = newRangeText .. "Launch Angle: " .. newCurrentLaunchAngle .. "°\n"
 					newRangeText = newRangeText .. "End Pos: " .. math.Round(math.ceil(newEndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(newEndPos.y * 100) / 10000)
 					
