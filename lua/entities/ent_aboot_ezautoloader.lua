@@ -24,6 +24,13 @@ ENT.StaticPerfSpecs = {
 	Armor = 2
 }
 
+--[[ TODO:
+- Fix the autoload checkbox and validate it works with wiremod and through the autoloader gui
+- Make autoloader take power to operate, display power
+- Balance autoloader durability and energy consumption
+- Give autoloader ability to load propellant?
+--]]
+
 -- Valid explosive classes that can be loaded
 local ValidExplosiveClasses = {
 	["ent_jack_gmod_ezincendiarybomb"] = true,
