@@ -45,7 +45,7 @@ if SERVER then
 			end
 		end)
 
-		self.IsArmed = false
+		self:SetIsArmed(false)
 	end
 
 	function ENT:PhysicsCollide(data, physobj)
@@ -143,7 +143,7 @@ if SERVER then
 			local shouldDetonate = data.Speed > (self.CollisionSpeedThreshold or 600)
 
 			if self.CollisionRequiresArmed then
-				shouldDetonate = shouldDetonate and self.IsArmed
+				shouldDetonate = shouldDetonate and self:GetIsArmed()
 			end
 
 			if shouldDetonate then
@@ -225,7 +225,7 @@ if SERVER then
 	end
 
 	function ENT:Think()
-		if self.IsArmed then
+		if self:GetIsArmed() then
 			if self.CreateTrailEffect then
 				self:CreateTrailEffect()
 			end
@@ -238,8 +238,8 @@ if SERVER then
 	end
 
 	function ENT:Arm()
-		if self.IsArmed then return end
-		self.IsArmed = true
+		if self:GetIsArmed() then return end
+		self:SetIsArmed(true)
 		if self.FuseTime <= 0.05 then
 			self:Detonate()
 		else
@@ -248,6 +248,14 @@ if SERVER then
 		if self.OnArmed then
 			self:OnArmed()
 		end
+	end
+
+	function ENT:GetIsArmed()
+		return self.IsArmed
+	end
+
+	function ENT:SetIsArmed(state)
+		self.IsArmed = tobool(state)
 	end
 
 elseif CLIENT then
