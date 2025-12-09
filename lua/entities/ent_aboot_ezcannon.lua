@@ -50,6 +50,7 @@ ENT.FireDelay = 1.5
 ENT.Spread = 0.01
 ENT.MaxPropSize = Vector(50, 15, 15) -- Max dimensions: largest, second largest, smallest
 ENT.ProjectileSpecs = nil
+ENT.MaxDurability = 1000 -- Maximum durability, can be overridden by other cannons
 
 local ProjectileSpecs = {
 	["prop_physics"] = {
@@ -301,6 +302,10 @@ function ENT:CalculateEstimatedRange()
 	return math.floor(horizontalRange), math.floor(EstimatedRangeMeters), math.floor(LaunchAngle), currentPos
 end
 
+function ENT:SetupDataTables()
+	self:NetworkVar("Bool", 0, "IsAutoLoading")
+end
+
 if SERVER then
 	function ENT:SpawnFunction(ply, tr)
 		local SpawnPos = tr.HitPos + tr.HitNormal * 20
@@ -343,11 +348,13 @@ if SERVER then
 		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
 		self.DesiredProjectileClass = self.DesiredProjectileClass or ""
 		self:SetDesiredProjectileClass(self.DesiredProjectileClass)
-		self.IsAutoLoading = self.IsAutoLoading or true
+		self:SetIsAutoLoading(true)
+		self.Durability = self.Durability or (self.MaxDurability or 1000)
+		self.MaxDurability = self.MaxDurability or 1000
 		---
 		if istable(WireLib) then
 			self.Inputs = WireLib.CreateInputs(self, {"Launch [NORMAL]", "Unload [NORMAL]", "PropellantPerShot [NORMAL]", "CalculateRange [NORMAL]", "DesiredProjectileClass [STRING]", "AutoLoading [NORMAL]"}, {"Fires the loaded Projectile", "Unloads Projectile", "Sets the amount of propellant used per shot (1-100)", "Triggers range calculation update", "Sets the desired projectile class for autoloading", "Enable (1) or disable (0) autoloading"})
-			self.Outputs = WireLib.CreateOutputs(self, {"LoadedProjectile [STRING]", "IsLoaded [NORMAL]", "Propellant [NORMAL]", "PropModel [STRING]", "CurrentPropellantPerShot [NORMAL]", "EstimatedRange [NORMAL]", "EstimatedRangeMeters [NORMAL]", "LaunchAngle [NORMAL]", "DesiredProjectileClass [STRING]", "AutoLoading [NORMAL]"}, {"The currently loaded Projectile type", "Whether a projectile is loaded (1) or not (0)", "Current propellant amount", "Model name of loaded prop (if applicable)", "Current propellant amount per shot", "Estimated range in units", "Estimated range in meters", "Current launch angle in degrees", "The desired projectile class for autoloading", "Whether autoloading is enabled (1) or disabled (0)"})
+			self.Outputs = WireLib.CreateOutputs(self, {"LoadedProjectile [STRING]", "IsLoaded [NORMAL]", "Propellant [NORMAL]", "PropModel [STRING]", "CurrentPropellantPerShot [NORMAL]", "EstimatedRange [NORMAL]", "EstimatedRangeMeters [NORMAL]", "LaunchAngle [NORMAL]", "DesiredProjectileClass [STRING]", "AutoLoading [NORMAL]", "Durability [NORMAL]"}, {"The currently loaded Projectile type", "Whether a projectile is loaded (1) or not (0)", "Current propellant amount", "Model name of loaded prop (if applicable)", "Current propellant amount per shot", "Estimated range in units", "Estimated range in meters", "Current launch angle in degrees", "The desired projectile class for autoloading", "Whether autoloading is enabled (1) or disabled (0)", "Current durability"})
 		end
 		
 		-- Sync initial state to clients
@@ -373,6 +380,7 @@ if SERVER then
 			WireLib.TriggerOutput(self, "LaunchAngle", launchAngle or 0)
 			WireLib.TriggerOutput(self, "DesiredProjectileClass", self:GetDesiredProjectileClass() or "")
 			WireLib.TriggerOutput(self, "AutoLoading", self:GetIsAutoLoading() and 1 or 0)
+			WireLib.TriggerOutput(self, "Durability", self.Durability or 0)
 		end
 	end
 	
@@ -385,7 +393,6 @@ if SERVER then
 		net.WriteUInt(self.CurrentPropellantPerShot or 20, 8)
 		net.WriteUInt(self.ProjectileMass or 0, 16) -- Send projectile mass instead of calculated range
 		net.WriteString(self:GetDesiredProjectileClass() or "")
-		net.WriteBool(self:GetIsAutoLoading() or false)
 		net.Broadcast()
 	end
 	
@@ -540,6 +547,24 @@ if SERVER then
 			end
 		end
 		
+		-- Repair durability with basic parts at 4x efficiency
+		if typ == JMod.EZ_RESOURCE_TYPES.BASICPARTS then
+			local MissingDurability = self.MaxDurability - (self.Durability or 0)
+			if MissingDurability > 0 then
+				-- 4x efficiency: 1 basic part = 4 durability
+				local DurabilityToRestore = math.min(amt * 4, MissingDurability)
+				local PartsUsed = math.ceil(DurabilityToRestore / 4)
+				
+				if PartsUsed > 0 then
+					self.Durability = math.min((self.Durability or 0) + DurabilityToRestore, self.MaxDurability)
+					self.NextRefillTime = CurTime() + 0.1
+					self:EmitSound("snd_jack_turretrepair.ogg", 65, math.random(90, 110))
+					self:UpdateWireOutputs()
+					return PartsUsed
+				end
+			end
+		end
+		
 		return 0
 	end
 
@@ -562,24 +587,6 @@ if SERVER then
 
 		self.DesiredProjectileClass = projectileClass
 		self:UpdateWireOutputs()
-	end
-
-	function ENT:GetIsAutoLoading()
-		return self.IsAutoLoading
-	end
-
-	function ENT:SetIsAutoLoading(isAutoLoading)
-		if not isbool(isAutoLoading) then return end
-
-		self.IsAutoLoading = isAutoLoading
-		self:UpdateWireOutputs()
-		self:SyncStateToClients()
-	end
-
-	function ENT:AutoLoadProjectile()
-		if not self.IsAutoLoading then return end
-
-		-- TODO: Implement auto loading by going through connected auto-loaders and finding the one with the projectile type we want, and then loading it.
 	end
 
 	function ENT:SetProjectileType(projectileType)
@@ -889,6 +896,27 @@ if SERVER then
 		-- Check if we have a projectile loaded
 		if not self.LoadedProjectileType then return end
 		
+		-- Check if cannon is unsafe (40% or less durability) and might blow up
+		if not unload then
+			local durabilityPercent = (self.Durability or self.MaxDurability) / (self.MaxDurability or 1000)
+			if durabilityPercent <= 0.4 then
+				-- Use JMod.LinCh to determine if cannon blows up
+				-- Higher chance with lower durability
+				local blowUpChance = (0.4 - durabilityPercent) * 2.5 -- 0% at 40%, up to 100% at 0%
+				if JMod.LinCh(blowUpChance * 100, 0, 100) then
+					self:BlowUp(false, nil)
+					-- Clear loaded projectile after blowing up
+					self.LoadedProjectileType = nil
+					self.PropModel = nil
+					return
+				end
+			end
+			
+			-- Reduce durability slightly on each shot
+			self.Durability = math.max(0, (self.Durability or self.MaxDurability) - 0.5)
+			self:UpdateWireOutputs()
+		end
+		
 		ply = ply or JMod.GetEZowner(self)
 		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
 		local SelfPos, LaunchAngle = self:GetPos(), self:GetAngles()
@@ -1044,7 +1072,7 @@ if SERVER then
 				self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
 				-- Consume propellant
-				--self.Propellant = self.Propellant - self.CurrentPropellantPerShot
+				self.Propellant = self.Propellant - self.CurrentPropellantPerShot
 				self:UpdateWireOutputs()
 				
 				if self.HasRocketMotor and not Specs.NoRocketMotor then
@@ -1090,8 +1118,140 @@ if SERVER then
 		end)
 	end
 
+	function ENT:BlowUp(fromDamage, projectileToDetonate)
+		-- Return early if no propellant
+		if not self.Propellant or self.Propellant <= 0 then
+			return
+		end
+		
+		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
+		local SelfPos = self:GetPos()
+		
+		-- Calculate breach position (opposite of barrel)
+		local BreachPos = SelfPos - Up * (self.BarrelLength or 30)
+		
+		-- Calculate explosion power based on propellant amount
+		local ExplosionPower = math.max(10, (self.Propellant or 0) * 0.5)
+		local ExplosionRadius = math.max(50, (self.Propellant or 0) * 2)
+		
+		-- Create explosion at breach position
+		local owner = JMod.GetEZowner(self)
+		JMod.Sploom(owner, BreachPos, ExplosionPower, ExplosionRadius)
+		
+		-- If there's a projectile, handle it
+		if self.LoadedProjectileType and self.LoadedProjectileType ~= "" then
+			if fromDamage and projectileToDetonate then
+				-- Detonate projectile on spawn if blowing up from damage
+				timer.Simple(0.01, function()
+					if IsValid(projectileToDetonate) then
+						if projectileToDetonate.Detonate then
+							projectileToDetonate:Detonate()
+						elseif projectileToDetonate.SetState then
+							projectileToDetonate:SetState(JMod.EZ_STATE_ON)
+							timer.Simple(0.1, function()
+								if IsValid(projectileToDetonate) and projectileToDetonate.Detonate then
+									projectileToDetonate:Detonate()
+								end
+							end)
+						end
+					end
+				end)
+			else
+				-- Toss projectile out instead of launching normally
+				local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
+				if Specs then
+					local LaunchedProjectile = ents.Create(Specs.ReplaceEnt or self.LoadedProjectileType)
+					LaunchedProjectile:SetPos(SelfPos)
+					
+					if Specs.UsePropModel then
+						LaunchedProjectile:SetModel(self.PropModel or "models/props_junk/wood_crate001a.mdl")
+						LaunchedProjectile:Spawn()
+						LaunchedProjectile:Activate()
+					else
+						LaunchedProjectile:Spawn()
+						LaunchedProjectile:Activate()
+					end
+					
+					JMod.SetEZowner(LaunchedProjectile, owner)
+					
+					-- Toss it out the front (barrel)
+					timer.Simple(0.01, function()
+						if IsValid(LaunchedProjectile) then
+							local phys = LaunchedProjectile:GetPhysicsObject()
+							if IsValid(phys) then
+								-- Toss forward with random direction
+								local tossDir = (Up + VectorRand() * 0.5):GetNormalized()
+								phys:SetVelocity(tossDir * 200)
+								phys:ApplyForceCenter(tossDir * 500)
+							end
+						end
+					end)
+				end
+			end
+		end
+		
+		-- Clear propellant after explosion
+		self.Propellant = 0
+		
+		-- Play breaking sound and sparks
+		self:EmitSound("snd_jack_turretbreak.ogg", 70, math.random(80, 120))
+		for i = 1, 20 do
+			JMod.DamageSpark(self)
+		end
+	end
+
 	function ENT:OnTakeDamage(dmginfo)
 		self:TakePhysicsDamage(dmginfo)
+
+		-- Reduce all incoming non-explosive damage by 50%
+		local damage = dmginfo:GetDamage()
+		local isExplosive = dmginfo:IsDamageType(DMG_BLAST) or dmginfo:IsDamageType(DMG_BURN) or dmginfo:IsExplosionDamage()
+		if not isExplosive then
+			damage = damage * 0.5
+		end
+		
+		-- Reduce durability based on damage
+		self.Durability = (self.Durability or self.MaxDurability) - damage
+		self:UpdateWireOutputs()
+		
+		-- Check if cannon should blow up from damage
+		-- Higher chance with more damage and lower durability
+		local durabilityPercent = (self.Durability or 0) / (self.MaxDurability or 1000)
+		local blowUpChance = math.max(0, (damage / 50) * (1 - durabilityPercent))
+		
+		if JMod.LinCh(blowUpChance * 100, 0, 100) then
+			-- Create projectile entity to detonate if applicable
+			local projectileToDetonate = nil
+			if self.LoadedProjectileType and self.LoadedProjectileType ~= "" then
+				local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
+				if Specs then
+					projectileToDetonate = ents.Create(Specs.ReplaceEnt or self.LoadedProjectileType)
+					projectileToDetonate:SetPos(self:GetPos())
+					if Specs.UsePropModel then
+						projectileToDetonate:SetModel(self.PropModel or "models/props_junk/wood_crate001a.mdl")
+					end
+					projectileToDetonate:Spawn()
+					projectileToDetonate:Activate()
+					JMod.SetEZowner(projectileToDetonate, JMod.GetEZowner(self))
+				end
+			end
+			
+			self:BlowUp(true, projectileToDetonate)
+			
+			-- Clear loaded projectile after blowing up
+			self.LoadedProjectileType = nil
+			self.PropModel = nil
+		end
+		
+		-- Check if durability is below 0 and destroy
+		if self.Durability <= 0 then
+			self:EmitSound("snd_jack_turretbreak.ogg", 70, math.random(80, 120))
+			for i = 1, 20 do
+				JMod.DamageSpark(self)
+			end
+			self:Destroy(dmginfo)
+			return
+		end
 
 		if JMod.LinCh(dmginfo:GetDamage(), 160, 300) then
 			self:Destroy(dmginfo)
@@ -1148,6 +1308,8 @@ if SERVER then
 		self.DupePropModel = self.PropModel
 		self.DupeCurrentPropellantPerShot = self.CurrentPropellantPerShot
 		self.DupeProjectileMass = self.ProjectileMass
+		self.DupeDurability = self.Durability
+		self.DupeMaxDurability = self.MaxDurability
 	end
 
 	function ENT:PostEntityPaste(ply, ent, createdEnts)
@@ -1163,6 +1325,8 @@ if SERVER then
 		ent.PropModel = ent.DupePropModel
 		ent.CurrentPropellantPerShot = ent.DupeCurrentPropellantPerShot or ent.DefaultPropellantPerShot
 		ent.ProjectileMass = ent.DupeProjectileMass or 0
+		ent.Durability = ent.DupeDurability or (ent.MaxDurability or 100)
+		ent.MaxDurability = ent.DupeMaxDurability or 100
 		JMod.SetEZowner(ent, ply, true)
 		ent:SyncStateToClients()
 	end
@@ -1196,7 +1360,6 @@ if SERVER then
 					net.WriteUInt(cannon.Propellant or 0, 8)
 					net.WriteUInt(cannon.CurrentPropellantPerShot or 20, 8)
 					net.WriteString(cannon:GetDesiredProjectileClass() or "")
-					net.WriteBool(cannon:GetIsAutoLoading() or false)
 				net.Send(ply)
 			end
 		elseif command == "fire" then
@@ -1230,7 +1393,6 @@ elseif CLIENT then
 		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
 		self.ProjectileMass = 0
 		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
-		self.IsAutoLoading = self.IsAutoLoading or true
 		
 		-- Custom model initialization
 		self:DrawShadow(true)
@@ -1320,7 +1482,6 @@ elseif CLIENT then
 			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 			cannon.ProjectileMass = net.ReadUInt(16) -- Read projectile mass
 			cannon.DesiredProjectileClass = net.ReadString() or ""
-			cannon.IsAutoLoading = net.ReadBool()
 
 			if IsValid(cannon) then
 				JMod_EZCannon_OpenGUI(cannon)
@@ -1332,7 +1493,6 @@ elseif CLIENT then
 				cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 				cannon.ProjectileMass = net.ReadUInt(16) -- Read projectile mass
 				cannon.DesiredProjectileClass = net.ReadString() or ""
-				cannon.IsAutoLoading = net.ReadBool()
 			end
 		end
 	end)
@@ -1342,7 +1502,7 @@ elseif CLIENT then
 		if not IsValid(cannon) then return end
 		
 		local frame = vgui.Create("DFrame")
-		frame:SetSize(400, 450)
+		frame:SetSize(400, 400)
 		frame:Center()
 		frame:SetTitle("EZ Cannon Control")
 		frame:MakePopup()
@@ -1525,17 +1685,10 @@ elseif CLIENT then
 		autoloadingCheckbox:SetSize(360, 25)
 		autoloadingCheckbox:SetText("Enable Autoloading")
 		autoloadingCheckbox:SetTextColor(Color(255, 255, 255, 200))
-		-- Ensure we have a boolean value (default to true if nil, matching server initialization)
-		local isAutoLoading = cannon.IsAutoLoading
-		if isAutoLoading == nil then
-			isAutoLoading = true -- Default value matches server initialization
-		end
-		autoloadingCheckbox:SetChecked(isAutoLoading)
+		autoloadingCheckbox:SetChecked(cannon:GetIsAutoLoading() or false)
 		autoloadingCheckbox.OnChange = function(self, val)
 			if IsValid(cannon) then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
-				-- Update local variable immediately
-				cannon.IsAutoLoading = val
 				net.Start("JMod_EZCannon_Command")
 					net.WriteEntity(cannon)
 					net.WriteString("setautoloading")
