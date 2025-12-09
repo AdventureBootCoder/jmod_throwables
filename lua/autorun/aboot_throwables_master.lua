@@ -23,7 +23,7 @@ if SERVER then
 			else
 				JMod.RemoveResourceConnection(Ent)
 			end
-		else		if Action == "toggle" then
+		elseif Action == "toggle" then
 			if IsValid(Ent2) and JMod.ConnectionValid(Ent, Ent2) and Ent2.GetState then 
 				if Ent2:GetState() == JMod.EZ_STATE_OFF then
 					Ent2:TurnOn(ply)
