@@ -10,7 +10,7 @@ ENT.NoSitAllowed = true
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
 ENT.Model = "models/props_phx/misc/smallcannonball.mdl"
-ENT.Material = "models/props_mining/ingot_jack_uranium"
+ENT.Material = "models/shiny"
 ENT.ModelScale = nil
 ENT.ImpactSound = "Grenade.ImpactHard"
 ENT.CollisionGroup = COLLISION_GROUP_NONE
@@ -29,7 +29,7 @@ ENT.FalloutRadius = 400
 ENT.FalloutDuration = 30
 ENT.FalloutDamage = 5
 ENT.FalloutParticleCount = 8
-ENT.ShellColor = Color(50, 255, 50, 30)
+ENT.ShellColor = Color(38, 173, 38)
 
 function ENT:SetupDataTables()
 	self:NetworkVar("Bool", 0, "Armed")
