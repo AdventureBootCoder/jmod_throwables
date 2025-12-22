@@ -3,8 +3,8 @@ AddCSLuaFile()
 ENT.Type = "anim"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
-ENT.Information = "glhfggwpezpznore"
-ENT.PrintName = "Shot Explosive"
+ENT.Information = "Solid cannon shot"
+ENT.PrintName = "Shot Solid"
 ENT.NoSitAllowed = true
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
@@ -17,13 +17,23 @@ ENT.JModEZstorable = true
 ENT.Mass = 45
 
 -- Base class configurable collision behavior
-ENT.CollisionSpeedThreshold = 600
+ENT.CollisionSpeedThreshold = 1000
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
-ENT.FuseTime = 15
+ENT.FuseTime = .5
+ENT.ImpactDetonation = false
 ENT.TrailEffectScale = 3
 ENT.TrailSoundVolume = 100
 ENT.ShellColor = nil
+
+function ENT:SpawnFunction(ply, tr, ClassName)
+	local SpawnPos = tr.HitPos + tr.HitNormal * 2
+	local ent = ents.Create(ClassName)
+	ent:SetPos(SpawnPos)
+	ent:Spawn()
+	ent:Activate()
+	return ent
+end
 
 if SERVER then
 	function ENT:Initialize()
@@ -42,6 +52,7 @@ if SERVER then
 			if IsValid(self) then
 				self:GetPhysicsObject():SetMass(self.Mass or 50)
 				self:GetPhysicsObject():EnableDrag(false)
+				self:GetPhysicsObject():Wake()
 			end
 		end)
 
@@ -50,7 +61,6 @@ if SERVER then
 
 	function ENT:PhysicsCollide(data, physobj)
 		if data.DeltaTime > 0.2 then
-
 			local SelfPos = self:GetPos()
 			if data.HitEntity == game.GetWorld() then
 				local WorldTr = util.TraceLine({
@@ -58,13 +68,14 @@ if SERVER then
 					endpos = data.HitPos + data.OurOldVelocity,
 					filter = {self}
 				})--]]
-
+				constraint.RemoveConstraints(self, "NoCollide")
 				local Constrained = self:IsPlayerHolding() or constraint.HasConstraints(self) or not self:GetPhysicsObject():IsMotionEnabled()
 
 				if WorldTr.HitSky and not(Constrained) then
 					local NewPos, TravelTime, NewVel = self:FindNextEmptySpace(data.OurOldVelocity)
 
 					if NewPos then
+						JMod.StartEZBombTrail(SelfPos, data.OurOldVelocity, NewPos, TravelTime)
 						timer.Simple(0, function()
 							if IsValid(self) then
 								self:SetNoDraw(true)
@@ -132,15 +143,13 @@ if SERVER then
 							self:GetPhysicsObject():EnableMotion(false)
 						end
 					end)
-
-					if math.random(1, 1000) == 1 then
-						-- A small chance for the bomb to not go off.
-						return
-					end
 				end
 			end
 
 			local shouldDetonate = data.Speed > (self.CollisionSpeedThreshold or 600)
+			if self.ImpactDetonation then
+				shouldDetonate = shouldDetonate and (CurTime() > self.NextDetonate)
+			end
 
 			if self.CollisionRequiresArmed then
 				shouldDetonate = shouldDetonate and self:GetIsArmed()
@@ -152,8 +161,9 @@ if SERVER then
 						self:Detonate(data)
 					end
 				end)
-			else
+			elseif data.Speed > 500 then
 				self:EmitSound(self.ImpactSound)
+				self:ImpactEffect(false, data.Speed / 1000)
 			end
 		end
 	end
@@ -185,19 +195,44 @@ if SERVER then
 		end
 	end
 
+	function ENT:ImpactEffect(detonate, force)
+		local SelfPos = self:LocalToWorld(self:OBBCenter())
+		local Up = Vector(0, 0, 1)
+		local EffectType = 1
+		local Traec = util.QuickTrace(self:GetPos(), Vector(0, 0, -5), self.Entity)
+		Up = Traec.HitNormal
+
+		if Traec.Hit then
+			if (Traec.MatType == MAT_DIRT) or (Traec.MatType == MAT_SAND) then
+				EffectType = 1
+			elseif (Traec.MatType == MAT_CONCRETE) or (Traec.MatType == MAT_TILE) then
+				EffectType = 2
+			elseif (Traec.MatType == MAT_METAL) or (Traec.MatType == MAT_GRATE) then
+				EffectType = 3
+			elseif Traec.MatType == MAT_WOOD then
+				EffectType = 4
+			end
+		else
+			EffectType = 5
+		end
+
+		local plooie = EffectData()
+		plooie:SetOrigin(Traec.HitPos)
+		plooie:SetScale(math.max(force or 1, 10))
+		plooie:SetRadius(EffectType)
+		plooie:SetNormal(Up)
+		util.Effect("eff_jack_sminebury", plooie, true, true)
+		if detonate then
+			util.ScreenShake(SelfPos, 99999, 99999, 1, 500)
+		end
+	end
+
 	function ENT:Detonate()
-		-- Do some shrapnel
-		local Attacker = JMod.GetEZowner(self)
+		-- Do some wrecking
 		local Pos = self:GetPos()
-		JMod.Sploom(Attacker, Pos, 50, 100)
-		JMod.FragSplosion(self, Pos + Vector(0, 0, 10), 1000, 100, 300, Attacker, nil, nil, nil, true)
 		JMod.WreckBuildings(self, Pos, 1, 1, true)
 		-- Do some effects
-		local Effect = EffectData()
-		Effect:SetOrigin(Pos)
-		Effect:SetScale(3)
-		Effect:SetNormal(Vector(0, 0, 1))
-		util.Effect("eff_jack_gmod_bpsmoke", Effect, true, true)
+		self:ImpactEffect(true, 10)
 		self:Remove()
 	end
 
@@ -216,12 +251,12 @@ if SERVER then
 
 	function ENT:CreateTrailEffect()
 		if self:GetNoDraw() then return end
-		local Fsh = EffectData()
+		--[[local Fsh = EffectData()
 		Fsh:SetOrigin(self:GetPos())
 		Fsh:SetScale(self.TrailEffectScale or 3)
 		Fsh:SetNormal(self:GetUp() * -1)
 		util.Effect("eff_jack_gmod_fuzeburn_smoky", Fsh, true, true)
-		self:EmitSound("snd_jack_sss.wav", self.TrailSoundVolume or 65, math.Rand(90, 110))
+		self:EmitSound("snd_jack_sss.wav", self.TrailSoundVolume or 65, math.Rand(90, 110))--]]
 	end
 
 	function ENT:Think()
@@ -230,17 +265,17 @@ if SERVER then
 				self:CreateTrailEffect()
 			end
 		end
-		if self.NextDetonate and self.NextDetonate < CurTime() then
+		if self.ImpactDetonation and self.NextDetonate and self.NextDetonate < CurTime() then
 			self:Detonate()
 		end
-		self:NextThink(CurTime() + .05)
+		self:NextThink(CurTime() + .06)
 		return true
 	end
 
 	function ENT:Arm()
 		if self:GetIsArmed() then return end
 		self:SetIsArmed(true)
-		if self.FuseTime <= 0.05 then
+		if self.FuseTime <= 0.05 and not self.ImpactDetonation then
 			self:Detonate()
 		else
 			self.NextDetonate = CurTime() + (self.FuseTime or 5)

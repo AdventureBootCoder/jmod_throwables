@@ -4,7 +4,7 @@ ENT.Type = "anim"
 ENT.Base = "ent_aboot_ezcannon_shot"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
-ENT.Information = "glhfggwpezpznore"
+ENT.Information = "For breaking stuff"
 ENT.PrintName = "Shot Angler"
 ENT.NoSitAllowed = true
 ENT.Spawnable = true
@@ -20,7 +20,8 @@ ENT.JModEZstorable = true
 ENT.CollisionSpeedThreshold = 1000
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0
-ENT.FuseTime = 10
+ENT.FuseTime = 0
+ENT.ImpactDetonation = true
 
 -- Angler-specific properties
 ENT.SpinSpeed = 1000
@@ -63,8 +64,6 @@ if SERVER then
 						end
 					end
 				end)
-				
-				self.NextDetonate = CurTime() + self.FuseTime
 			end
 			if data.Speed > 10 then
 				self:EmitSound(self.ImpactSound)
