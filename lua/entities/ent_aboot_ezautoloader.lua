@@ -56,8 +56,8 @@ local ValidExplosiveClasses = {
 	--["prop_physics"] = true -- Allow props too
 }
 
-ENT.MaxCapacity = 10 -- Maximum number of explosives that can be stored
-ENT.MaxPropellant = 1000 -- Maximum propellant storage capacity
+ENT.MaxCapacity = 5 -- Maximum number of explosives that can be stored
+ENT.MaxPropellant = 100 -- Maximum propellant storage capacity
 
 function ENT:CustomSetupDataTables()
 	self:NetworkVar("Int", 2, "LoadedCount")
