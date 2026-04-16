@@ -888,7 +888,7 @@ if SERVER then
 		end)
 	end
 
-	function ENT:LaunchProjectile(unload, ply)
+	function ENT:LaunchProjectile(unload, ply, forceMult)
 		local Time = CurTime()
 		if not(unload) and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
 		self.NextLaunchTime = Time + (self.FireDelay or 1.5)
@@ -1026,7 +1026,7 @@ if SERVER then
 				-- Apply the calculated force with projectile-specific multipliers
 				local Spread = self.Spread or 0.01
 				local LaunchDir = (Up + Right * math.Rand(-1, 1) * Spread + Forward * math.Rand(-1, 1) * Spread):GetNormalized()
-				local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1)
+				local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1) * (forceMult or Vector(1, 1, 1))
 
 				-- Calculate if projectile will be 'supersonic'
 				local ProjectileMass = LaunchPhys:GetMass()
@@ -1087,6 +1087,7 @@ if SERVER then
 					
 					timer.Simple(.5, function()
 						if IsValid(RocketMotor) and IsValid(LaunchedProjectile) then
+							LaunchedProjectile:SetAngles(LaunchAngle)
 							RocketMotor:Launch()
 							RocketMotor.ThrustStuckTo = true
 						end

@@ -80,7 +80,7 @@ if SERVER then
 		self.NextUseTime = 0
 		self.LoadedExplosives = {}
 		self.Propellant = 0
-		self.EZpowerSocket = Vector(0, 0, 20) -- Connection point for cables
+		self.EZpowerSocketPos = Vector(0, 0, 20) -- Connection point for cables
 		self.ConnectionResourceType = "Entity" -- Use Entity as resource type for connections
 		self.EZconsumes = {JMod.EZ_RESOURCE_TYPES.PROPELLANT, JMod.EZ_RESOURCE_TYPES.POWER} -- Allow propellant and power to be loaded via resource connections
 		self.ShouldBeOn = false -- Remember if we should turn back on when power returns
