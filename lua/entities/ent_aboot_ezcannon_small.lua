@@ -10,14 +10,15 @@ ENT.Spawnable = true
 ENT.AdminSpawnable = false
 
 -- Override properties for smaller cannon
-ENT.JModPreferredCarryAngles = Angle(90, 0, 0)
+ENT.JModPreferredCarryAngles = Angle(0, 0, 0)
 ENT.EZbuoyancy = .3
 ENT.Mass = 150 -- Lighter than the main cannon
-ENT.Model = "models/props_phx/misc/potato_launcher.mdl"
+ENT.Model = "models/aboot/cannon/cannon_01.mdl"
 
 ENT.DefaultPropellantPerShot = 10
 ENT.MaxPropellant = 50 
-ENT.BarrelLength = 40
+ENT.BarrelLength = 45
+ENT.BreachOffset = -45
 --ENT.PropellantForce = 5000
 ENT.MaxPropellantForce = 500000
 ENT.TargetPropellant = 40
@@ -26,18 +27,28 @@ ENT.FireDelay = 1
 ENT.Spread = 0.001
 ENT.MaxPropSize = Vector(45, 6, 6) -- Max dimensions: largest, second largest, smallest (smaller than main cannon)
 
+ENT.ProjectileBone = "projectile"
+ENT.BreachOffset = 0
+ENT.MuzzleAttachment = "muzzle"
+
+ENT.OpenSequence = "open"
+ENT.ExtractSequence = "open_extract"
+ENT.IdleSequence = "idle_close"
+ENT.IdleEmptySequence = "idle_open_empty"
+ENT.LoadSequence = "load_close"
+
 ENT.ProjectileSpecs = {
 	["prop_physics"] = {
 		UsePropModel = true
 	},
 	["ent_jack_gmod_ezherocket"] = {
 		ArmDelay = .5,
-		LaunchOffset = 10,
+		LaunchOffset = Vector(0, 0, 10),
 		ForceMult = 2
 	},
 	["ent_jack_gmod_ezheatrocket"] = {
 		ArmDelay = .5,
-		LaunchOffset = 10,
+		LaunchOffset = Vector(0, 0, 10),
 		ForceMult = 2
 	},
 	["ent_jack_gmod_ezstickynade"] = {
@@ -47,7 +58,9 @@ ENT.ProjectileSpecs = {
 		ArmDelay = 0
 	},
 	["ent_jack_gmod_ezimpactnade"] = {
-		ArmDelay = 0
+		ArmDelay = 0,
+		Angles = Angle(180, 0, 0),
+		LaunchOffset = Vector(-4.25, 0, -3),
 	},
 	["ent_jack_gmod_ezfirenade"] = {
 		ArmDelay = .05
@@ -66,25 +79,9 @@ ENT.ProjectileSpecs = {
 	}
 }
 
--- Override EZconsumes to remove some expensive resources
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
-	JMod.EZ_RESOURCE_TYPES.PROPELLANT,
-	JMod.EZ_RESOURCE_TYPES.EXPLOSIVES,
-	JMod.EZ_RESOURCE_TYPES.CHEMICALS,
-	JMod.EZ_RESOURCE_TYPES.PAPER,
-	JMod.EZ_RESOURCE_TYPES.STEEL,
-	JMod.EZ_RESOURCE_TYPES.LEAD,
-	JMod.EZ_RESOURCE_TYPES.TITANIUM,
-	JMod.EZ_RESOURCE_TYPES.COPPER,
-	JMod.EZ_RESOURCE_TYPES.URANIUM,
-	JMod.EZ_RESOURCE_TYPES.SILVER,
-	JMod.EZ_RESOURCE_TYPES.GOLD,
-	JMod.EZ_RESOURCE_TYPES.PLATINUM,
-	JMod.EZ_RESOURCE_TYPES.RUBBER,
-	JMod.EZ_RESOURCE_TYPES.TUNGSTEN,
-	JMod.EZ_RESOURCE_TYPES.CERAMIC,
-	JMod.EZ_RESOURCE_TYPES.ANTIMATTER
+	JMod.EZ_RESOURCE_TYPES.PROPELLANT
 }
 
 if CLIENT then
@@ -99,7 +96,7 @@ if CLIENT then
 		-- Custom model initialization for small cannon
 		self:DrawShadow(true)
 		
-		-- Create custom models for small cannon
+		--[[-- Create custom models for small cannon
 		self.Chamber = JMod.MakeModel(self, "models/props_phx/misc/potato_launcher_chamber.mdl", "phoenix_storms/metal_plate")
 		self.Cap = JMod.MakeModel(self, "models/props_phx/misc/potato_launcher_cap.mdl", "phoenix_storms/metal_plate")
 		
@@ -114,10 +111,10 @@ if CLIENT then
 		self.CapTargetPos = Vector(0, 0, 0)
 
 		local mins, maxs = self:GetRenderBounds()
-		self:SetRenderBounds(mins + Vector(-3, -3, -32), maxs + Vector(13, 3, 0))
+		self:SetRenderBounds(mins + Vector(-3, -3, -32), maxs + Vector(13, 3, 0))--]]
 	end
 
-	function ENT:Think()
+	--[[function ENT:Think()
 		local FT = FrameTime()
 		
 		-- Smooth animation for chamber
@@ -194,5 +191,14 @@ if CLIENT then
 		if IsValid(self.Cap) then
 			self.Cap:Remove()
 		end
+	end--]]
+
+	function ENT:Think()
+		self:NextThink(CurTime())
+		return true
+	end
+
+	function ENT:Draw()
+		self:DrawModel()
 	end
 end 
