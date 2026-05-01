@@ -41,18 +41,18 @@ local ValidExplosiveClasses = {
 	["ent_jack_gmod_eznuke_small"] = true,
 	["ent_jack_gmod_ezcriticalityweapon"] = true,
 	["ent_jack_gmod_ezpowderkeg"] = true,
-	["ent_aboot_ezcannon_shot"] = true,
-	["ent_aboot_ezcannon_shot_plasma"] = true,
-	["ent_aboot_ezcannon_shot_cannister"] = true,
-	["ent_aboot_ezcannon_shot_angler"] = true,
-	["ent_aboot_ezcannon_shot_ceramic"] = true,
-	["ent_aboot_ezcannon_shot_copper"] = true,
-	["ent_aboot_ezcannon_shot_uranium"] = true,
-	["ent_aboot_ezcannon_shot_silver"] = true,
-	["ent_aboot_ezcannon_shot_gold"] = true,
-	["ent_aboot_ezcannon_shot_platinum"] = true,
-	["ent_aboot_ezcannon_shot_rubber"] = true,
-	["ent_aboot_ezcannon_shot_tungsten"] = true--,
+	["ent_aboot_ezshot"] = true,
+	["ent_aboot_ezshot_plasma"] = true,
+	["ent_aboot_ezshot_cannister"] = true,
+	["ent_aboot_ezshot_angler"] = true,
+	["ent_aboot_ezshot_ceramic"] = true,
+	["ent_aboot_ezshot_copper"] = true,
+	["ent_aboot_ezshot_uranium"] = true,
+	["ent_aboot_ezshot_silver"] = true,
+	["ent_aboot_ezshot_gold"] = true,
+	["ent_aboot_ezshot_platinum"] = true,
+	["ent_aboot_ezshot_rubber"] = true,
+	["ent_aboot_ezshot_tungsten"] = true--,
 	--["prop_physics"] = true -- Allow props too
 }
 
@@ -394,9 +394,9 @@ if SERVER then
 		local ExplosivesToSpawn = math.floor(#self.LoadedExplosives / 2)
 		if ExplosivesToSpawn > 0 then
 			for i = 1, ExplosivesToSpawn do
-				timer.Simple(i * 0.05, function()
-					local ExplosiveClass = self.LoadedExplosives[i]
-					if ExplosiveClass then
+				local ExplosiveClass = self.LoadedExplosives[i]
+				if ExplosiveClass then
+					timer.Simple(i * 0.05, function()
 						local Explosive = ents.Create(ExplosiveClass)
 						if IsValid(Explosive) then
 							-- Spawn explosive in a random position around the autoloader
@@ -439,8 +439,8 @@ if SERVER then
 								end
 							end)
 						end
-					end
-				end)
+					end)
+				end
 			end
 		end
 		

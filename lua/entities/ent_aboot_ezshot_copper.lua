@@ -1,7 +1,7 @@
 --AdventureBoots 2025
 AddCSLuaFile()
 ENT.Type = "anim"
-ENT.Base = "ent_aboot_ezcannon_shot"
+ENT.Base = "ent_aboot_ezshot"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
 ENT.Information = "Copper shot that creates chain lightning effects"
@@ -54,7 +54,7 @@ if SERVER then
 		-- Find nearby targets
 		local targets = {}
 		for _, ent in pairs(ents.FindInSphere(startPos, range)) do
-			if ent:GetClass() ~= "ent_aboot_ezcannon_shot_copper" and IsValid(ent:GetPhysicsObject()) then
+			if ent:GetClass() ~= "ent_aboot_ezshot_copper" and IsValid(ent:GetPhysicsObject()) then
 				table.insert(targets, ent)
 			end
 		end

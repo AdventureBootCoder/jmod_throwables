@@ -1,7 +1,7 @@
 --AdventureBoots 2025
 AddCSLuaFile()
 ENT.Type = "anim"
-ENT.Base = "ent_aboot_ezcannon_shot"
+ENT.Base = "ent_aboot_ezshot"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
 ENT.Information = "Tungsten penetration round designed to pierce through props"
@@ -27,7 +27,7 @@ ENT.PenetrationDamage = 100 -- Increased damage to props when penetrating
 ENT.MaxPenetrationDistance = 200 -- Maximum distance for penetration
 ENT.Mass = 20 -- Heavier for better penetration
 ENT.DensityMultiplier = 0.8 -- How much density affects penetration
-local BaseClass = baseclass.Get("ent_aboot_ezcannon_shot")
+local BaseClass = baseclass.Get("ent_aboot_ezshot")
 
 if SERVER then
 	function ENT:PhysicsCollide(data, physobj)

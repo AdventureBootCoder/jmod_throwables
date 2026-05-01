@@ -1,7 +1,7 @@
 ﻿--AdventureBoots 2025
 AddCSLuaFile()
 ENT.Type = "anim"
-ENT.Base = "ent_aboot_ezcannon_shot"
+ENT.Base = "ent_aboot_ezshot"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
 ENT.Information = "glhfggwpezpznore"

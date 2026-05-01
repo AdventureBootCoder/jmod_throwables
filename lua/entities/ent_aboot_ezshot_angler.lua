@@ -1,7 +1,7 @@
 --AdventureBoots 2025
 AddCSLuaFile()
 ENT.Type = "anim"
-ENT.Base = "ent_aboot_ezcannon_shot"
+ENT.Base = "ent_aboot_ezshot"
 ENT.Author = "AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
 ENT.Information = "For breaking stuff"
@@ -9,7 +9,7 @@ ENT.PrintName = "Shot Angler"
 ENT.NoSitAllowed = true
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
-ENT.Model = "models/aboot/cannon/chain_shot.mdl"
+ENT.Model = "models/aboot/shot/chain_shot.mdl"
 ENT.Material = "phoenix_storms/gear"
 ENT.ModelScale = nil
 ENT.ImpactSound = "Grenade.ImpactHard"
