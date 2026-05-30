@@ -9,7 +9,7 @@ ENT.PrintName = "Shot Angler"
 ENT.NoSitAllowed = true
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
-ENT.Model = "models/aboot/shot/chain_shot.mdl"
+ENT.Model = "models/jmod_shot/chain_shot.mdl"
 ENT.Material = "phoenix_storms/gear"
 ENT.ModelScale = nil
 ENT.ImpactSound = "Grenade.ImpactHard"
@@ -24,7 +24,7 @@ ENT.FuseTime = 0
 ENT.ImpactDetonation = true
 
 -- Angler-specific properties
-ENT.SpinSpeed = 1000
+ENT.SpinSpeed = 100
 ENT.SpinAxis = Vector(0, 0, 1) -- Spin around X axis
 ENT.FocusedDamageRadius = .01 -- Smaller radius for focused damage
 ENT.FocusedWreckPower = 40 -- Higher wreck power for focused destruction

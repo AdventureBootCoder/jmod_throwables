@@ -1,5 +1,6 @@
 --AdventureBoots 2025
 AddCSLuaFile()
+DEFINE_BASECLASS("ent_aboot_ezcannon")
 ENT.Type = "anim"
 ENT.Base = "ent_aboot_ezcannon"
 ENT.Author = "Jackarunda, AdventureBoots"
@@ -12,77 +13,50 @@ ENT.AdminSpawnable = false
 -- Override properties for smaller cannon
 ENT.JModPreferredCarryAngles = Angle(0, 0, 0)
 ENT.EZbuoyancy = .3
-ENT.Mass = 150 -- Lighter than the main cannon
-ENT.Model = "models/aboot/cannon/cannon_01.mdl"
+ENT.Mass = 280 -- Lighter than the main cannon
+ENT.Model = "models/jmod_cannons/cannon_med.mdl"
 
 ENT.DefaultPropellantPerShot = 10
 ENT.MaxPropellant = 50 
-ENT.BarrelLength = 45
-ENT.BreachOffset = -45
+ENT.TargetPropellant = 25
+ENT.TargetPercentage = .8
 --ENT.PropellantForce = 5000
 ENT.MaxPropellantForce = 500000
-ENT.TargetPropellant = 40
-ENT.TargetPercentage = .8
-ENT.FireDelay = 1
+ENT.BarrelLength = 45
+ENT.BreachOffset = -45
+ENT.LaunchDelay = 1
 ENT.Spread = 0.001
 ENT.MaxPropSize = Vector(45, 6, 6) -- Max dimensions: largest, second largest, smallest (smaller than main cannon)
 
 ENT.ProjectileBone = "projectile"
 ENT.BreachOffset = 0
 ENT.MuzzleAttachment = "muzzle"
+ENT.BreechHB = "breach"
 
 ENT.OpenSequence = "open"
 ENT.ExtractSequence = "open_extract"
 ENT.IdleSequence = "idle_close"
 ENT.IdleEmptySequence = "idle_open_empty"
 ENT.LoadSequence = "load_close"
-
-ENT.ProjectileSpecs = {
-	["prop_physics"] = {
-		UsePropModel = true
-	},
-	["ent_jack_gmod_ezherocket"] = {
-		ArmDelay = .5,
-		LaunchOffset = Vector(0, 0, 10),
-		ForceMult = 2
-	},
-	["ent_jack_gmod_ezheatrocket"] = {
-		ArmDelay = .5,
-		LaunchOffset = Vector(0, 0, 10),
-		ForceMult = 2
-	},
-	["ent_jack_gmod_ezstickynade"] = {
-		ArmDelay = .05
-	},
-	["ent_jack_gmod_ezfragnade"] = {
-		ArmDelay = 0
-	},
-	["ent_jack_gmod_ezimpactnade"] = {
-		ArmDelay = 0,
-		Angles = Angle(180, 0, 0),
-		LaunchOffset = Vector(-4.25, 0, -3),
-	},
-	["ent_jack_gmod_ezfirenade"] = {
-		ArmDelay = .05
-	},
-	["ent_jack_gmod_ezflashbang"] = {
-		ArmDelay = .05
-	},
-	["ent_jack_gmod_ezsmokegrenade"] = {
-		ArmDelay = .05
-	},
-	["ent_jack_gmod_ezroadflare"] = {
-		ArmDelay = 1
-	},
-	["ent_jack_gmod_ezflareprojectile"] = {
-		ForceMult = .1
-	}
+ENT.CaseModel = Model("models/jmod_shot/shell_120_base.mdl")
+ENT.CaseBodygroup =  {
+	LOADED = {1, 0},
+	EJECTING = {1, 1},
+	EMPTY = {1, 2}
 }
 
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
 	JMod.EZ_RESOURCE_TYPES.PROPELLANT
 }
+
+function ENT:GetLaunchDir()
+	return -self:GetForward()
+end
+
+function ENT:GetLaunchPos()
+	return self:GetPos() + self:GetLaunchDir() * self.BarrelLength
+end
 
 if CLIENT then
 	-- Override client initialization for custom models

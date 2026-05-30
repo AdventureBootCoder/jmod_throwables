@@ -20,14 +20,21 @@ ENT.Mass = 45
 ENT.CollisionSpeedThreshold = 1000
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
+ENT.CollisionDirection = nil
 ENT.FuseTime = .5
 ENT.ImpactDetonation = false
 ENT.TrailEffectScale = 3
 ENT.TrailSoundVolume = 100
 ENT.ShellColor = nil
 
+--[[ 
+Arm: Prepares an explosive to be fired, or initiates a timer to detonate.
+Launch: Provides a boost to movement, or initiates a timer to detonate.
+Detonate: Triggers the explosive to detonate.
+--]]
+
 function ENT:SpawnFunction(ply, tr, ClassName)
-	local SpawnPos = tr.HitPos + tr.HitNormal * 2
+	local SpawnPos = tr.HitPos + tr.HitNormal * 10
 	local ent = ents.Create(ClassName)
 	ent:SetPos(SpawnPos)
 	ent:Spawn()
@@ -38,7 +45,9 @@ end
 if SERVER then
 	function ENT:Initialize()
 		self:SetModel(self.Model)
-		self:SetMaterial(self.Material)
+		if self.Material then
+			self:SetMaterial(self.Material)
+		end
 		self:PhysicsInit(SOLID_VPHYSICS)
 		self:SetMoveType(MOVETYPE_VPHYSICS)
 		self:SetSolid(SOLID_VPHYSICS)
@@ -72,7 +81,7 @@ if SERVER then
 				local Constrained = self:IsPlayerHolding() or constraint.HasConstraints(self) or not self:GetPhysicsObject():IsMotionEnabled()
 
 				if WorldTr.HitSky and not(Constrained) then
-					local NewPos, TravelTime, NewVel = self:FindNextEmptySpace(data.OurOldVelocity)
+					local NewPos, TravelTime, NewVel = JMod.FindSkyboxEntryPoint(SelfPos, data.OurOldVelocity, self, self.Mass, 1, 60, 0.25, {self})
 
 					if NewPos then
 						JMod.StartEZBombTrail(SelfPos, data.OurOldVelocity, NewPos, TravelTime)
@@ -114,7 +123,7 @@ if SERVER then
 
 					local Eff = EffectData()
 					Eff:SetOrigin(WorldTr.HitPos)
-					Eff:SetScale(10)
+					Eff:SetScale(5)
 					Eff:SetNormal(WorldTr.HitNormal)
 					util.Effect("eff_jack_sminebury", Eff, true, true)
 					--
@@ -128,31 +137,31 @@ if SERVER then
 							BuryAngle = LerpAngle(Hardness - .2, BuryAngle, OldAngle)
 							self:SetAngles(BuryAngle)
 							local StickOffSet = self:GetPos() - self:WorldSpaceCenter()
-							--print(StickOffSet)
 							self:SetPos(WorldTr.HitPos + StickOffSet + WorldTr.HitNormal * 10)
 							--
-							--[[local EmptySpaceTr = util.QuickTrace(self:LocalToWorld(self:OBBCenter()) + OurNoseDir * 100, -OurNoseDir * 200, {self})
-							if not EmptySpaceTr.StartSolid and not EmptySpaceTr.HitSky and EmptySpaceTr.Hit then
-								timer.Simple(DetTime + .1, function()
-									JMod.Sploom(JMod.GetEZowner(self), WorldTr.HitPos, 100)
-								end)
-								self:SetPos(EmptySpaceTr.HitPos + EmptySpaceTr.Normal * -EmptySpaceTr.Fraction * 100)
-							else
-								self:GetPhysicsObject():EnableMotion(false)
-							end--]]
 							self:GetPhysicsObject():EnableMotion(false)
 						end
 					end)
 				end
 			end
 
-			local shouldDetonate = data.Speed > (self.CollisionSpeedThreshold or 600)
+			local shouldDetonate = data.Speed > self.CollisionSpeedThreshold
 			if self.ImpactDetonation then
-				shouldDetonate = shouldDetonate and (CurTime() > self.NextDetonate)
+				shouldDetonate = shouldDetonate and (CurTime() > self.DetonateTime)
 			end
 
 			if self.CollisionRequiresArmed then
 				shouldDetonate = shouldDetonate and self:GetIsArmed()
+			end
+
+			if self.CollisionDirection then
+				local Pos = self:GetPos()
+				local DetonateDir = (Pos - self:LocalToWorld(self.CollisionDirection)):GetNormalized()
+				local Diff = (Pos - data.HitPos)
+				local Product = DetonateDir:Dot(Diff) / Diff:Length()
+				if Product < 0.60 then
+					shouldDetonate = false
+				end
 			end
 
 			if shouldDetonate then
@@ -165,33 +174,6 @@ if SERVER then
 				self:EmitSound(self.ImpactSound)
 				self:ImpactEffect(false, data.Speed / 1000)
 			end
-		end
-	end
-
-	function ENT:FindNextEmptySpace(vel)
-		local Pos = self:GetPos()
-		local Grav = physenv.GetGravity()
-
-		for i = 1, 100 do
-			Pos = Pos + (vel / 2)
-
-			if util.IsInWorld(Pos) then
-				local SkyTr = util.TraceLine({
-					start = Pos,
-					endpos = Pos - vel,
-					filter = {self},
-					mask = MASK_SOLID_BRUSHONLY
-				})
-				if SkyTr.HitSky then
-
-					Pos = SkyTr.HitPos + (SkyTr.Normal * -10)
-					debugoverlay.Cross(Pos, 5, 2, Color(255, 0, 0), true)
-					return Pos, i / 2, vel
-				end
-			else
-				debugoverlay.Cross(Pos, 5, 2, Color(0, 255, 200), true)
-			end
-			vel = vel + Grav / 2
 		end
 	end
 
@@ -265,7 +247,7 @@ if SERVER then
 				self:CreateTrailEffect()
 			end
 		end
-		if self.ImpactDetonation and self.NextDetonate and self.NextDetonate < CurTime() then
+		if self.ImpactDetonation and self.DetonateTime and self.DetonateTime < CurTime() then
 			self:Detonate()
 		end
 		self:NextThink(CurTime() + .06)
@@ -278,7 +260,7 @@ if SERVER then
 		if self.FuseTime <= 0.05 and not self.ImpactDetonation then
 			self:Detonate()
 		else
-			self.NextDetonate = CurTime() + (self.FuseTime or 5)
+			self.DetonateTime = CurTime() + (self.FuseTime or 5)
 		end
 		if self.OnArmed then
 			self:OnArmed()
@@ -291,6 +273,21 @@ if SERVER then
 
 	function ENT:SetIsArmed(state)
 		self.IsArmed = tobool(state)
+	end
+
+	function ENT:Launch(ply, shouldForce)
+		--
+	end
+
+	function ENT:OnTakeDamage(dmginfo)
+		self:TakePhysicsDamage(dmginfo)
+		if JMod.LinCh(dmginfo:GetDamage(), 50, 300) then
+			timer.Simple(0, function()
+				if IsValid(self) then
+					self:Detonate()
+				end
+			end)
+		end
 	end
 
 elseif CLIENT then

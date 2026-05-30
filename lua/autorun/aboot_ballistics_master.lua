@@ -2,6 +2,185 @@
 -- Networking for autoloader entity
 JModBallistics = JModBallistics or {}
 
+JModBallistics.ProjectileSpecs = {}
+JModBallistics.ProjectileSpecs["ent_aboot_ezcannon"] = {
+	includes = {}, -- special table for referencing other specs
+	types = {
+		["prop_physics"] = {
+			UsePropModel = true,
+			DisplayName = "Prop Physics"
+		},
+		["ent_jack_gmod_ezincendiarybomb"] = {
+			ArmDelay = .1,
+			DisplayName = "Incendiary Bomb"
+		},
+		["ent_jack_gmod_ezthermobaricbomb"] = {
+			ArmDelay = .1,
+			DisplayName = "Thermobaric Bomb"
+		},
+		["ent_jack_gmod_ezclusterbomb"] = {
+			ArmDelay = .1,
+			DisplayName = "Cluster Bomb"
+		},
+		["ent_jack_gmod_ezsmallbomb"] = {
+			ArmDelay = 1,
+			DisplayName = "Small Bomb"
+		},
+		["ent_jack_gmod_ezhebomb"] = {
+			ArmDelay = .2,
+			DisplayName = "HE Bomb"
+		},
+		["ent_jack_gmod_ezfumigator"] = {
+			ArmDelay = .5,
+			ArmMethod = "Fume",
+			RightCorrection = -90,
+			DisplayName = "Fumigator"
+		},
+		["ent_jack_gmod_ezflareprojectile"] = {
+			ForceMult = .1,
+			DisplayName = "Flare Projectile"
+		},
+		["ent_jack_gmod_eznuke_small"] = {	
+			ArmDelay = 1,
+			DisplayName = "Small Nuke"
+		},
+		["ent_jack_gmod_ezcriticalityweapon"] = {
+			ArmDelay = 3,
+			ArmMethod = "Detonate",
+			DisplayName = "Criticality Weapon"
+		},
+		["ent_jack_gmod_ezpowderkeg"] = {
+			ArmDelay = .2,
+			ArmMethod = "Detonate",
+			DisplayName = "Powder Keg"
+		},
+		["ent_aboot_ezshot"] = {
+			ArmDelay = .1,
+			DisplayName = "Cannon Shot"
+		},
+		["ent_aboot_ezshot_plasma"] = {
+			ArmDelay = .1,
+			DisplayName = "Plasma Shot"
+		},
+		["ent_aboot_ezshot_cannister"] = {
+			ArmDelay = .05,
+			DisplayName = "Cannister Shot"
+		},
+		["ent_aboot_ezshot_angler"] = {
+			ArmDelay = .1,
+			Angles = Angle(0, 90, 0),
+			DisplayName = "Angler Shot"
+		},
+		["ent_aboot_ezshot_ceramic"] = {
+			ArmDelay = .1,
+			DisplayName = "Ceramic Shot"
+		},
+		["ent_aboot_ezshot_copper"] = {
+			ArmDelay = .1,
+			DisplayName = "Copper Shot"
+		},
+		["ent_aboot_ezshot_uranium"] = {
+			ArmDelay = .1,
+			DisplayName = "Uranium Shot"
+		},
+		["ent_aboot_ezshot_silver"] = {
+			ArmDelay = .1,
+			DisplayName = "Silver Shot"
+		},
+		["ent_aboot_ezshot_gold"] = {
+			ArmDelay = .1,
+			DisplayName = "Gold Shot"
+		},
+		["ent_aboot_ezshot_platinum"] = {
+			ArmDelay = .1,
+			DisplayName = "Platinum Shot"
+		},
+		["ent_aboot_ezshot_rubber"] = {
+			ArmDelay = .1,
+			DisplayName = "Rubber Shot"
+		},
+		["ent_aboot_ezshot_tungsten"] = {
+			ArmDelay = .1,
+			DisplayName = "Tungsten Shot"
+		}
+	}
+}
+JModBallistics.ProjectileSpecs["ent_aboot_ezcannon_small"] = {
+	types = {
+		["prop_physics"] = {
+			UsePropModel = true
+		},
+		["ent_aboot_ezshot_shell"] = {
+			PowderAdd = 25,
+			DisplayName = "Shell Shot",
+			Angles = Angle(-90, 0, 0),
+			ArmMethod = "Launch"
+		},
+		["ent_jack_gmod_ezherocket"] = {
+			ArmDelay = .2,
+			PowderAdd = 50,
+			Angles = Angle(0, 0, 90),
+			LaunchOffset = Vector(-30, 1.5, 0)
+		},
+		["ent_jack_gmod_ezheatrocket"] = {
+			ArmDelay = .2,
+			PowderAdd = 50,
+			Angles = Angle(0, 0, 90),
+			LaunchOffset = Vector(-30, 1.5, 0)
+		},
+		["ent_jack_gmod_ezstickynade"] = {
+			Angles = Angle(180, 0, 0)
+		},
+		["ent_jack_gmod_ezfragnade"] = {
+			ArmDelay = 0
+		},
+		["ent_jack_gmod_ezimpactnade"] = {
+			Angles = Angle(180, 0, 0),
+			LaunchOffset = Vector(-4.25, 0, -3),
+		},
+		["ent_jack_gmod_ezfirenade"] = {
+			ArmDelay = .05
+		},
+		["ent_jack_gmod_ezflashbang"] = {
+			ArmDelay = .05
+		},
+		["ent_jack_gmod_ezsmokegrenade"] = {
+			ArmDelay = .05
+		},
+		["ent_jack_gmod_ezroadflare"] = {
+			ArmDelay = .5
+		},
+		["ent_jack_gmod_ezflareprojectile"] = {
+			ForceMult = .1
+		}
+	}
+}
+
+local function UpdateProjectileSpecs()
+	for class, specsTable in pairs(JModBallistics.ProjectileSpecs) do
+		if specsTable.includes then
+			for _, includeStr in pairs(specsTable.includes) do -- This might not actually work, we'll see
+				table.Merge(specsTable.types, JModBallistics.ProjectileSpecs[includeStr].types, true)
+			end
+		end
+
+		for _, ent in pairs(ents.FindByClass(class)) do
+			if IsValid(ent) then ent.ProjectileSpecs = specsTable.types end
+		end
+	end
+end
+
+JModBallistics.ProjectilesInitialized = JModBallistics.ProjectilesInitialized or false
+
+hook.Add("InitPostEntity", "JMod_Ballistics_UpdateProjectileSpecs", function()
+	UpdateProjectileSpecs()
+	JModBallistics.ProjectilesInitialized = true
+end)
+
+if JModBallistics.ProjectilesInitialized then
+	UpdateProjectileSpecs()
+end
+
 if SERVER then
 	util.AddNetworkString("JMod_EZAutoloader_ModifyConnections")
 
@@ -275,6 +454,8 @@ if CLIENT then
 	-- GUI function
 	function JMod_EZCannon_OpenGUI(cannon)
 		if not IsValid(cannon) then return end
+		local CannonClass = cannon:GetClass()
+		local ProjectileSpecs = JModBallistics.ProjectileSpecs[CannonClass].types
 		
 		local frame = vgui.Create("DFrame")
 		frame:SetSize(400, 400)
@@ -315,7 +496,7 @@ if CLIENT then
 		-- Get display name for loaded projectile
 		local loadedDisplayName = "None"
 		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[cannon.LoadedProjectileType]
+			local specs = ProjectileSpecs[cannon.LoadedProjectileType]
 			if specs and specs.DisplayName then
 				loadedDisplayName = specs.DisplayName
 			else
@@ -325,61 +506,61 @@ if CLIENT then
 		
 		infoLabel:SetText("Cannon Status:\n" .. 
 			"Loaded: " .. loadedDisplayName .. "\n" ..
-			"Propellant: " .. (cannon.Propellant or 0) .. "/" .. (cannon.MaxPropellant or 100))
+			"Powder: " .. cannon:GetPowder() .. " (charge " .. (cannon.Propellant or 0) .. "/" .. (cannon.MaxPropellant or 100) .. ")")
 		infoLabel:SetWrap(true)
 		infoLabel:SetTextColor(Color(255, 255, 255, 200))
 		
-		-- Range info panel (right side)
-		local rangePanel = vgui.Create("DPanel", frame)
-		rangePanel:SetPos(210, 30)
-		rangePanel:SetSize(180, 100)
+		-- Muzzle velocity info panel (right side)
+		local velocityPanel = vgui.Create("DPanel", frame)
+		velocityPanel:SetPos(210, 30)
+		velocityPanel:SetSize(180, 100)
 		
-		function rangePanel:Paint(w, h)
+		function velocityPanel:Paint(w, h)
 			surface.SetDrawColor(0, 0, 0, 100)
 			surface.DrawRect(0, 0, w, h)
 		end
 		
-		local rangeLabel = vgui.Create("DLabel", rangePanel)
-		rangeLabel:SetPos(10, 10)
-		rangeLabel:SetSize(160, 80)
+		local velocityLabel = vgui.Create("DLabel", velocityPanel)
+		velocityLabel:SetPos(10, 10)
+		velocityLabel:SetSize(160, 80)
 		
-		-- Calculate range and angle on client side
-		local estimatedRange, estimatedRangeMeters, currentLaunchAngle, EndPos = JModBallistics.CalculateEstimatedRange(
-			cannon:LocalToWorld(cannon:OBBCenter()), 
-			nil, 
-			cannon.ProjectileMass, 
-			cannon:CalculateForceCurve(cannon.CurrentPropellantPerShot), 
-			cannon:GetLaunchDir(), 
-			60, 
-			0.1
-		)
-		
-		local rangeText = "Range Info:\n"
-		local rangeColor = Color(255, 255, 255, 200)
-		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-			-- Always show range if projectile is loaded, even if low
-			if estimatedRange and estimatedRange > 0 then
-				rangeText = rangeText .. "Estimated: " .. estimatedRangeMeters .. " m\n"
-				rangeText = rangeText .. "Launch Angle: " .. tostring(currentLaunchAngle) .. "°\n"
-				rangeText = rangeText .. "End Pos: " .. math.Round(math.ceil(EndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(EndPos.y * 100) / 10000)
-				-- Use JMod.GoodBadColor for dynamic color coding
-				local rangeQuality = math.Clamp(estimatedRange / 200, 0, 1) -- Normalize to 0-1 (200m = max quality)
-				rangeColor = JMod.GoodBadColor(rangeQuality, 200)
-			else
-				-- Show that range is being calculated
-				rangeText = rangeText .. "Calculating...\n"
-				rangeText = rangeText .. "Launch Angle: " .. tostring(currentLaunchAngle) .. "°\n"
-				rangeText = rangeText .. "Range Unknown"
-				rangeColor = Color(255, 165, 0, 200) -- Orange for calculating
-			end
-		else
-			rangeText = rangeText .. "No projectile\nloaded"
-			rangeColor = Color(150, 150, 150, 200) -- Gray when no projectile
+		-- Calculate muzzle velocity on client side
+		local currentMuzzleVelocity = 0
+		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" and cannon.ProjectileMass and cannon.ProjectileMass > 0 then
+			local force = cannon:CalculateForceCurve(cannon:GetPowder())
+			currentMuzzleVelocity = force / cannon.ProjectileMass
 		end
 		
-		rangeLabel:SetText(rangeText)
-		rangeLabel:SetWrap(true)
-		rangeLabel:SetTextColor(rangeColor)
+		local velocityText = "Muzzle Velocity:\n"
+		local velocityColor = Color(255, 255, 255, 200)
+		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
+			if currentMuzzleVelocity > 0 then
+				-- Convert to more readable units (m/s)
+				local velocityMetersPerSec = math.Round(currentMuzzleVelocity * 0.01905)
+				velocityText = velocityText .. velocityMetersPerSec .. " m/s\n"
+				velocityText = velocityText .. "(" .. math.Round(currentMuzzleVelocity) .. " u/s)\n"
+				
+				-- Get display name for loaded projectile
+				local specs = ProjectileSpecs[cannon.LoadedProjectileType]
+				local projectileName = (specs and specs.DisplayName) or cannon.LoadedProjectileType
+				velocityText = velocityText .. "Mass: " .. cannon.ProjectileMass .. " kg"
+				
+				-- Color code based on velocity (higher velocity = greener)
+				local velocityQuality = math.Clamp(currentMuzzleVelocity / 5000, 0, 1) -- Normalize to 0-1 (5000 u/s = max quality)
+				velocityColor = JMod.GoodBadColor(velocityQuality, 200)
+			else
+				velocityText = velocityText .. "No mass data\n"
+				velocityText = velocityText .. "Cannot calculate"
+				velocityColor = Color(255, 165, 0, 200) -- Orange for no data
+			end
+		else
+			velocityText = velocityText .. "No projectile\nloaded"
+			velocityColor = Color(150, 150, 150, 200) -- Gray when no projectile
+		end
+		
+		velocityLabel:SetText(velocityText)
+		velocityLabel:SetWrap(true)
+		velocityLabel:SetTextColor(velocityColor)
 		
 		-- Propellant control panel
 		local controlPanel = vgui.Create("DPanel", frame)
@@ -419,13 +600,13 @@ if CLIENT then
 
 		-- Add all valid projectile types
 		local projectileKeys = {}
-		for class, _ in pairs(cannon.ProjectileSpecs or ProjectileSpecs) do
+		for class, _ in pairs(ProjectileSpecs) do
 			table.insert(projectileKeys, class)
 		end
 		table.sort(projectileKeys)
 		
 		for _, class in ipairs(projectileKeys) do
-			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[class]
+			local specs = ProjectileSpecs[class]
 			local displayName = (specs and specs.DisplayName) or class
 			projectileCombo:AddChoice(displayName, class)
 		end
@@ -436,7 +617,7 @@ if CLIENT then
 		-- Get current display name for desired projectile
 		local currentDisplayName = "None"
 		if cannon.DesiredProjectileClass and cannon.DesiredProjectileClass ~= "" then
-			local specs = (cannon.ProjectileSpecs or ProjectileSpecs)[cannon.DesiredProjectileClass]
+			local specs = ProjectileSpecs[cannon.DesiredProjectileClass]
 			if specs and specs.DisplayName then
 				currentDisplayName = specs.DisplayName
 			else
@@ -510,7 +691,7 @@ if CLIENT then
 		
 		fireButton.DoClick = function()
 			if IsValid(cannon) and cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-				if cannon.Propellant < cannon.CurrentPropellantPerShot then
+				if cannon:GetPowder() < cannon.CurrentPropellantPerShot then
 					surface.PlaySound("snds_jack_gmod/ez_gui/miss.ogg")
 					notification.AddLegacy("Not enough propellant!", NOTIFY_ERROR, 2)
 					return
@@ -589,29 +770,39 @@ if CLIENT then
 				net.WriteUInt(math.floor(value), 8)
 				net.SendToServer()
 				
-				-- Update range display in real-time
-				local newEstimatedRange, newEstimatedRangeMeters, newCurrentLaunchAngle, newEndPos = JModBallistics.CalculateEstimatedRange(
-					cannon:LocalToWorld(cannon:OBBCenter()), 
-					nil, 
-					cannon.ProjectileMass, 
-					cannon:CalculateForceCurve(cannon.CurrentPropellantPerShot), 
-					cannon:GetLaunchDir(), 
-					60, 
-					0.1
-				)
-				
-				if newEstimatedRange and newEstimatedRange > 0 then
-					local newRangeText = "Range Info:\n"
-					newRangeText = newRangeText .. "Estimated: " .. newEstimatedRangeMeters .. " m\n"
-					newRangeText = newRangeText .. "Launch Angle: " .. newCurrentLaunchAngle .. "°\n"
-					newRangeText = newRangeText .. "End Pos: " .. math.Round(math.ceil(newEndPos.x * 100) / 10000) .. ", " .. math.Round(math.ceil(newEndPos.y * 100) / 10000)
-					
-					local newRangeQuality = math.Clamp(newEstimatedRange / 200, 0, 1)
-					local newRangeColor = JMod.GoodBadColor(newRangeQuality, 200)
-					
-					rangeLabel:SetText(newRangeText)
-					rangeLabel:SetTextColor(newRangeColor)
+				-- Update muzzle velocity display in real-time
+				local newMuzzleVelocity = 0
+				if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" and cannon.ProjectileMass and cannon.ProjectileMass > 0 then
+					local newForce = cannon:CalculateForceCurve(cannon:GetPowder())
+					newMuzzleVelocity = newForce / cannon.ProjectileMass
 				end
+				
+				local newVelocityText = "Muzzle Velocity:\n"
+				local newVelocityColor = Color(255, 255, 255, 200)
+				
+				if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
+					if newMuzzleVelocity > 0 then
+						-- Convert to more readable units (m/s)
+						local velocityMetersPerSec = math.Round(newMuzzleVelocity * 0.01905)
+						newVelocityText = newVelocityText .. velocityMetersPerSec .. " m/s\n"
+						newVelocityText = newVelocityText .. "(" .. math.Round(newMuzzleVelocity) .. " u/s)\n"
+						newVelocityText = newVelocityText .. "Mass: " .. cannon.ProjectileMass .. " kg"
+						
+						-- Color code based on velocity (higher velocity = greener)
+						local velocityQuality = math.Clamp(newMuzzleVelocity / 5000, 0, 1)
+						newVelocityColor = JMod.GoodBadColor(velocityQuality, 200)
+					else
+						newVelocityText = newVelocityText .. "No mass data\n"
+						newVelocityText = newVelocityText .. "Cannot calculate"
+						newVelocityColor = Color(255, 165, 0, 200)
+					end
+				else
+					newVelocityText = newVelocityText .. "No projectile\nloaded"
+					newVelocityColor = Color(150, 150, 150, 200)
+				end
+				
+				velocityLabel:SetText(newVelocityText)
+				velocityLabel:SetTextColor(newVelocityColor)
 			end
 		end
 		

@@ -1,5 +1,5 @@
-# jmod_throwables
-A repository for the upcoming Garry's Mod addon and JMod addition, JMod Throwables. (Name is subject to change)
+# JMod Ballistics
+A repository for the upcoming Garry's Mod addon and JMod addition, JMod Ballistics.
 
 ### Currently addition plans are:
 - Howitzer, a powerful cannon capable of launching all small EZ bombs and lots of custom cannon shot. [ Almost done ]

@@ -70,7 +70,7 @@ if SERVER then
 		Effect:SetOrigin(startPos)
 		Effect:SetStart(target:GetPos())
 		Effect:SetScale(1)
-		util.Effect("eff_aboot_throwables_lightning", Effect, true, true)
+		util.Effect("eff_aboot_lightning", Effect, true, true)
 		
 		-- Damage the target
 		if target:IsPlayer() or target:IsNPC() then
@@ -120,7 +120,7 @@ if SERVER then
 		Effect:SetOrigin(Pos)
 		Effect:SetScale(3)
 		Effect:SetNormal(Vector(0, 0, 1))
-		util.Effect("eff_aboot_throwables_electricalexplosion", Effect, true, true)
+		util.Effect("eff_aboot_electricalexplosion", Effect, true, true)
 		
 		-- Play electrical explosion sound
 		self:EmitSound("ambient/energy/zap" .. math.random(1, 3) .. ".wav", 100, math.Rand(80, 100))

@@ -22,22 +22,7 @@ ENT.Model = "models/props_phx/misc/smallcannon.mdl"
 ---
 ENT.EZconsumes = {
 	JMod.EZ_RESOURCE_TYPES.BASICPARTS,
-	JMod.EZ_RESOURCE_TYPES.PROPELLANT,
-	JMod.EZ_RESOURCE_TYPES.EXPLOSIVES,
-	JMod.EZ_RESOURCE_TYPES.CHEMICALS,
-	JMod.EZ_RESOURCE_TYPES.PAPER,
-	JMod.EZ_RESOURCE_TYPES.STEEL,
-	JMod.EZ_RESOURCE_TYPES.LEAD,
-	JMod.EZ_RESOURCE_TYPES.TITANIUM,
-	JMod.EZ_RESOURCE_TYPES.COPPER,
-	JMod.EZ_RESOURCE_TYPES.URANIUM,
-	JMod.EZ_RESOURCE_TYPES.SILVER,
-	JMod.EZ_RESOURCE_TYPES.GOLD,
-	JMod.EZ_RESOURCE_TYPES.PLATINUM,
-	JMod.EZ_RESOURCE_TYPES.RUBBER,
-	JMod.EZ_RESOURCE_TYPES.TUNGSTEN,
-	JMod.EZ_RESOURCE_TYPES.CERAMIC,
-	JMod.EZ_RESOURCE_TYPES.ANTIMATTER
+	JMod.EZ_RESOURCE_TYPES.PROPELLANT
 }
 
 ENT.DefaultPropellantPerShot = 20
@@ -51,7 +36,6 @@ ENT.TargetPercentage = .5
 ENT.FireDelay = 1.5
 ENT.Spread = 0.01
 ENT.MaxPropSize = Vector(50, 15, 15) -- Max dimensions: largest, second largest, smallest
-ENT.ProjectileSpecs = nil
 ENT.MaxDurability = 1000 -- Maximum durability, can be overridden by other cannons
 
 ENT.OpenSequence = "open"
@@ -65,7 +49,6 @@ ENT.WireInputSetup = {
 	LAUNCH = {"Launch", "[NORMAL]", "Fires the loaded Projectile"},
 	UNLOAD = {"Unload", "[NORMAL]", "Unloads Projectile"},
 	PROPELLETPERSHOT = {"PropellantPerShot", "[NORMAL]", "Sets the amount of propellant used per shot (1-100)"},
-	CALCULATERANGE = {"CalculateRange", "[NORMAL]", "Triggers range calculation update"},
 	DESIREDPROJECTILECLASS = {"DesiredProjectileClass", "[STRING]", "Sets the desired projectile class for autoloading"},
 	AUTOLOADING = {"AutoLoading", "[NORMAL]", "Enable (1) or disable (0) autoloading"},
 	DURABILITY = {"Durability", "[NORMAL]", "Current durability"},
@@ -75,139 +58,11 @@ ENT.WireOutputSetup = {
 	ISLOADED = {"IsLoaded", "[NORMAL]", "Whether a projectile is loaded (1) or not (0)"},
 	PROPLEL = {"Propellant", "[NORMAL]", "Current propellant amount"},
 	PROPMODEL = {"PropModel", "[STRING]", "Model name of loaded prop (if applicable)"},
-	LAUNCHFORCE = {"LaunchForce", "[NORMAL]", "Current launch force"},
 	CURRENTPROPELLETPERSHOT = {"CurrentPropellantPerShot", "[NORMAL]", "Current propellant amount per shot"},
-	ESTIMATEDRANGE = {"EstimatedRange", "[NORMAL]", "Estimated range in units"},
-	ESTIMATEDRANGEMETERS = {"EstimatedRangeMeters", "[NORMAL]", "Estimated range in meters"},
-	LAUNCHANGLE = {"LaunchAngle", "[NORMAL]", "Current launch angle in degrees"},
+	MUZZLEVELOCITY = {"MuzzleVelocity", "[NORMAL]", "Calculated muzzle velocity in units/second"},
 	DESIREDPROJECTILECLASS = {"DesiredProjectileClass", "[STRING]", "The desired projectile class for autoloading"},
 	AUTOLOADING = {"AutoLoading", "[NORMAL]", "Whether autoloading is enabled (1) or disabled (0)"},
 	DURABILITY = {"Durability", "[NORMAL]", "Current durability"},
-}
-
-local ProjectileSpecs = {
-	["prop_physics"] = {
-		UsePropModel = true,
-		DefaultMass = 100,
-		DisplayName = "Prop Physics"
-	},
-	["ent_jack_gmod_ezincendiarybomb"] = {
-		ArmDelay = .1,
-		DefaultMass = 100,
-		DisplayName = "Incendiary Bomb"
-	},
-	["ent_jack_gmod_ezthermobaricbomb"] = {
-		ArmDelay = .1,
-		DefaultMass = 100,
-		DisplayName = "Thermobaric Bomb"
-	},
-	["ent_jack_gmod_ezclusterbomb"] = {
-		ArmDelay = .1,
-		DefaultMass = 100,
-		DisplayName = "Cluster Bomb"
-	},
-	["ent_jack_gmod_ezsmallbomb"] = {
-		ArmDelay = 1,
-		DefaultMass = 80,
-		DisplayName = "Small Bomb"
-	},
-	["ent_jack_gmod_ezhebomb"] = {
-		ArmDelay = .2,
-		DefaultMass = 100,
-		DisplayName = "HE Bomb"
-	},
-	["ent_jack_gmod_ezfumigator"] = {
-		ArmDelay = .5,
-		ArmMethod = "Fume",
-		RightCorrection = -90,
-		DefaultMass = 20,
-		DisplayName = "Fumigator"
-	},
-	["ent_jack_gmod_ezflareprojectile"] = {
-		ForceMult = .1,
-		DefaultMass = 10,
-		DisplayName = "Flare Projectile"
-	},
-	["ent_jack_gmod_eznuke_small"] = {	
-		ArmDelay = 1,
-		DefaultMass = 100,
-		DisplayName = "Small Nuke"
-	},
-	["ent_jack_gmod_ezcriticalityweapon"] = {
-		ArmDelay = 3,
-		ArmMethod = "Detonate",
-		ForceMult = 2,
-		DefaultMass = 150,
-		DisplayName = "Criticality Weapon"
-	},
-	["ent_jack_gmod_ezpowderkeg"] = {
-		ArmDelay = .2,
-		ArmMethod = "Detonate",
-		DefaultMass = 50,
-		DisplayName = "Powder Keg"
-	},
-	["ent_aboot_ezshot"] = {
-		ArmDelay = .1,
-		DefaultMass = 50,
-		DisplayName = "Cannon Shot"
-	},
-	["ent_aboot_ezshot_plasma"] = {
-		ArmDelay = .1,
-		ForceMult = 2,
-		DefaultMass = .1,
-		DisplayName = "Plasma Shot"
-	},
-	["ent_aboot_ezshot_cannister"] = {
-		ArmDelay = .05,
-		DefaultMass = 50,
-		DisplayName = "Cannister Shot"
-	},
-	["ent_aboot_ezshot_angler"] = {
-		ArmDelay = .1,
-		Angles = Angle(0, 90, 0),
-		DefaultMass = 50,
-		DisplayName = "Angler Shot"
-	},
-	["ent_aboot_ezshot_ceramic"] = {
-		ArmDelay = .1,
-		DefaultMass = 35,
-		DisplayName = "Ceramic Shot"
-	},
-	["ent_aboot_ezshot_copper"] = {
-		ArmDelay = .1,
-		DefaultMass = 55,
-		DisplayName = "Copper Shot"
-	},
-	["ent_aboot_ezshot_uranium"] = {
-		ArmDelay = .1,
-		DefaultMass = 75,
-		DisplayName = "Uranium Shot"
-	},
-	["ent_aboot_ezshot_silver"] = {
-		ArmDelay = .1,
-		DefaultMass = 60,
-		DisplayName = "Silver Shot"
-	},
-	["ent_aboot_ezshot_gold"] = {
-		ArmDelay = .1,
-		DefaultMass = 65,
-		DisplayName = "Gold Shot"
-	},
-	["ent_aboot_ezshot_platinum"] = {
-		ArmDelay = .1,
-		DefaultMass = 70,
-		DisplayName = "Platinum Shot"
-	},
-	["ent_aboot_ezshot_rubber"] = {
-		ArmDelay = .1,
-		DefaultMass = 30,
-		DisplayName = "Rubber Shot"
-	},
-	["ent_aboot_ezshot_tungsten"] = {
-		ArmDelay = .1,
-		DefaultMass = 80,
-		DisplayName = "Tungsten Shot"
-	}
 }
 
 -- Function to calculate force based on propellant amount using exponential curve
@@ -221,18 +76,62 @@ function ENT:CalculateForceCurve(propellantAmount)
 	return self.MaxPropellantForce * (1 - math.exp(-propellantAmount * k))
 end
 
--- World point used to align projectile center when launching (matches legacy launch math; no BreachOffset)
+-- Calculate muzzle velocity using powder force curve and projectile mass
+function ENT:CalculateMuzzleVelocity(propellantAmount)
+	-- Return 0 if no valid projectile is loaded
+	if not IsValid(self.LoadedProjectileEnt) then
+		return 0
+	end
+	
+	-- Get the force from the powder curve
+	local force = self:CalculateForceCurve(propellantAmount or self:GetPowder())
+	
+	-- Get projectile mass (use stored mass or get from physics object)
+	local mass = self.ProjectileMass or 1
+	if IsValid(self.LoadedProjectileEnt) then
+		local phys = self.LoadedProjectileEnt:GetPhysicsObject()
+		if IsValid(phys) then
+			local physMass = phys:GetMass()
+			-- Use physics mass if reasonable, otherwise use stored/default
+			if physMass > 0 and physMass <= 20000 then
+				mass = physMass
+			end
+		end
+	end
+	
+	-- Calculate muzzle velocity: velocity = force / mass
+	return force / mass
+end
+
+-- Combined powder available for a shot: loaded charge + projectile's built-in PowderAdd
+function ENT:GetPowder()
+	local PowderAdd = 0
+	if self.LoadedProjectileType and self.LoadedProjectileType ~= "" and self.ProjectileSpecs then
+		local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
+		if Specs and Specs.PowderAdd then PowderAdd = Specs.PowderAdd end
+	end
+	return (self.Propellant or 0) + PowderAdd
+end
+
+function ENT:GetLaunchDir()
+	return self:GetUp()
+end
+
+function ENT:GetLaunchPos()
+	return self:LocalToWorld(self:OBBCenter()) + self:GetLaunchDir() * self.BarrelLength
+end
+
 function ENT:GetLaunchPosAng()
 	if self.MuzzleAttachment then
 		local AttachmentIndex = self:LookupAttachment(self.MuzzleAttachment)
-		if AttachmentIndex then
+		if AttachmentIndex > 0 then
 			local AttachmentInfo = self:GetAttachment(AttachmentIndex)
 
 			return AttachmentInfo.Pos, AttachmentInfo.Ang
 		end
 	end
 
-	return self:LocalToWorld(self:OBBCenter()) + self:GetUp() * (self.BarrelLength or 30), self:GetAngles()
+	return self:GetLaunchPos(), self:GetLaunchDir():Angle()
 end
 
 -- World point when seating a loaded projectile along the barrel (includes BreachOffset from breech)
@@ -249,8 +148,10 @@ function ENT:GetLoadPosCenter()
 	return self:LocalToWorld(self:OBBCenter()) + Up * (self.BreachOffset or 0)
 end
 
-function ENT:GetLaunchDir()
-	return self:GetUp()
+function ENT:SetCaseBodygroup(bodygroup)
+	if self.CaseBodygroup and self.CaseBodygroup[bodygroup] then
+		self:SetBodygroup(self.CaseBodygroup[bodygroup][1], self.CaseBodygroup[bodygroup][2])
+	end
 end
 
 function ENT:SetupDataTables()
@@ -294,9 +195,7 @@ if SERVER then
 		self.Propellant = self.Propellant or 0
 		self.CurrentPropellantPerShot = self.CurrentPropellantPerShot or self.DefaultPropellantPerShot
 		self.ProjectileMass = self.ProjectileMass or 0
-		self.EstimatedRange = 0
-		self.LastRangeCalculation = 0
-		self.ProjectileSpecs = self.ProjectileSpecs or ProjectileSpecs
+		self.ProjectileSpecs = JModBallistics.ProjectileSpecs[self:GetClass()].types or {}
 		self.DesiredProjectileClass = self.DesiredProjectileClass or ""
 		self:SetDesiredProjectileClass(self.DesiredProjectileClass)
 		self:SetIsAutoLoading(true)
@@ -327,32 +226,17 @@ if SERVER then
 			end
 		end)
 	end
--- TODO: MAKE THIS MORE EFFICIENT
 	function ENT:UpdateWireOutputs(outputName)
 		if istable(WireLib) then
-			-- Calculate current range and angle
-			local ProjectileSpecs = self.ProjectileSpecs[self.LoadedProjectileType]
-			local LaunchDir = self:GetLaunchDir()
-			local LuanchForce = self:CalculateForceCurve(self.CurrentPropellantPerShot)
-			local estimatedRange, estimatedRangeMeters, launchAngle = JModBallistics.CalculateEstimatedRange(
-				self:LocalToWorld(self:OBBCenter()) + LaunchDir * (self.BarrelLength or 30), 
-				nil, --self.LoadedProjectileEnt, 
-				self.ProjectileMass, 
-				LuanchForce * 1, 
-				LaunchDir, 
-				60, 
-				0.1
-			)
+			-- Calculate current muzzle velocity
+			local MuzzleVelocity = self:CalculateMuzzleVelocity(self:GetPowder())
 			
 			WireLib.TriggerOutput(self, "IsLoaded", IsValid(self.LoadedProjectileEnt) and 1 or 0)
 			WireLib.TriggerOutput(self, "LoadedProjectile", IsValid(self.LoadedProjectileEnt) and (self.LoadedProjectileType or "") or "")
 			WireLib.TriggerOutput(self, "Propellant", self.Propellant or 0)
 			WireLib.TriggerOutput(self, "PropModel", self.PropModel or "")
-			WireLib.TriggerOutput(self, "LaunchForce", LuanchForce or 0)
 			WireLib.TriggerOutput(self, "CurrentPropellantPerShot", self.CurrentPropellantPerShot or 0)
-			WireLib.TriggerOutput(self, "EstimatedRange", estimatedRange or 0)
-			WireLib.TriggerOutput(self, "EstimatedRangeMeters", estimatedRangeMeters or 0)
-			WireLib.TriggerOutput(self, "LaunchAngle", launchAngle or 0)
+			WireLib.TriggerOutput(self, "MuzzleVelocity", MuzzleVelocity or 0)
 			WireLib.TriggerOutput(self, "DesiredProjectileClass", self:GetDesiredProjectileClass() or "")
 			WireLib.TriggerOutput(self, "AutoLoading", self:GetIsAutoLoading() and 1 or 0)
 			WireLib.TriggerOutput(self, "Durability", self.Durability or 0)
@@ -380,13 +264,6 @@ if SERVER then
 			self.CurrentPropellantPerShot = math.Clamp(value, 1, self.MaxPropellant or 100)
 			self:UpdateWireOutputs()
 			self:SyncStateToClients()
-		elseif iname == "CalculateRange" and value > 0 then
-			-- Rate limit the calculation to once every 0.2 seconds
-			local currentTime = CurTime()
-			if not self.LastRangeCalculation or (currentTime - self.LastRangeCalculation) >= 0.2 then
-				self.LastRangeCalculation = currentTime
-				self:UpdateWireOutputs()
-			end
 		elseif iname == "DesiredProjectileClass" then
 			if isstring(value) then
 				self:SetDesiredProjectileClass(value)
@@ -507,11 +384,11 @@ if SERVER then
 		-- Same as legacy launch: OBB alignment must use the projectile at cannon origin first,
 		-- or LocalToWorld(OBBCenter) is wrong and the shot ends up under/off the barrel.
 		local SelfPos = self:GetPos()
-		Projectile:SetPos(SelfPos)
 		local CannonBarrelCenter = self:GetLoadPosCenter()
 		local ProjectileCenter = Projectile:LocalToWorld(Projectile:OBBCenter() + (Specs.LaunchOffset or vector_origin))
 		-- Seat the bottom of the projectile's longest OBB axis (post-rotation, aligned with cannon Up) at the breach anchor
 		local _, longestSize = self:CalculatePropLaunchAngle(Projectile)
+		local LaunchOffset = Specs.LaunchOffset or vector_origin
 		local LaunchPos = SelfPos + (CannonBarrelCenter - ProjectileCenter) + Up * (longestSize * 0.5)
 		Projectile:SetPos(LaunchPos)
 
@@ -539,30 +416,30 @@ if SERVER then
 		self:EmitSound("snd_jack_metallicload.ogg", 65, 90)
 		self:UpdateWireOutputs()
 		self:SyncStateToClients()
+
+		self:SetCaseBodygroup("LOADED")
+
 		return true
 	end
 
-	function ENT:SpawnAndAttachProjectileClass(className)
-		if not isstring(className) or className == "" then return false end
-		if IsValid(self.LoadedProjectileEnt) then return false end
-		local Specs = self.ProjectileSpecs[className]
-		if not Specs then return false end
+	function ENT:InsideBreechHB(hitPos, hitNormal, physobj)
+		if not self.BreechHB or self.BreechHB == "" then return true end
 
-		local ply = JMod.GetEZowner(self)
-		local ent = ents.Create(Specs.ReplaceEnt or className)
-		if not IsValid(ent) then return false end
-		ent:SetPos(self:GetPos())
-		if Specs.UsePropModel and self.PropModel then
-			ent:SetModel(self.PropModel)
-		end
-		ent:Spawn()
-		ent:Activate()
-		JMod.SetEZowner(ent, ply)
-		if self:FinishLoadingProjectile(ent, className) then
-			return true
-		end
-		SafeRemoveEntity(ent)
-		return false
+		local tr = util.TraceLine({
+			start = hitPos + hitNormal * 10,
+			endpos = hitPos,
+			filter = {self},
+			whitelist = true,
+			ignoreworld = true
+		})
+
+		--print(tr.HitBox)
+		--self:SetHitboxSet(tr.HitBox)
+
+		--local hitboxID, hitboxGroup = self:GetHitboxSet(self.BreechHB)
+		--print(hitboxID, hitboxGroup, hitboxGroup == self.BreechHB)
+		--debugoverlay.Cross(hitPos, 10, 1, Color(255, 0, 0), true)
+		return true--hitboxGroup == self.BreechHB
 	end
 
 	function ENT:PhysicsCollide(data, physobj)
@@ -576,59 +453,36 @@ if SERVER then
 
 			if self.Destroyed then return end
 
-			if self.ProjectileSpecs[ent:GetClass()] then
+			if data.Speed > 5000 and not(ent:IsPlayerHolding()) then
+				--self:Destroy()
+			end
+
+			if not self:InsideBreechHB(data.HitPos, data.HitNormal, physobj) then return end
+
+			local desiredClass = self:GetDesiredProjectileClass()
+			local entClass = ent:GetClass()
+
+			if self.ProjectileSpecs[entClass] and (desiredClass == "" or desiredClass == entClass) then
+				if entClass == "prop_physics" and desiredClass == "" then
+					
+					return
+				end
 				local cannon, hitEnt = self, ent
 				timer.Simple(0, function()
 					if not IsValid(cannon) or not IsValid(hitEnt) then return end
 					cannon:LoadProjectile(hitEnt)
 				end)
 			end
-
-			if (ent:GetClass() == "ent_jack_gmod_ezrocketmotor") and not self.HasRocketMotor and not ent.StuckTo then
-				self.HasRocketMotor = true
-				self:EmitSound("snd_jack_metallicload.ogg", 65, 90)
-				SafeRemoveEntity(ent)
-			end
-
-			if data.Speed > 5000 and not(ent:IsPlayerHolding()) then
-				self:Destroy()
-			end
 		end
 	end
-
-	ENT.ResourcesToShot = {
-		[JMod.EZ_RESOURCE_TYPES.STEEL] = {"ent_aboot_ezshot", 10},
-		[JMod.EZ_RESOURCE_TYPES.ANTIMATTER] = {"ent_aboot_ezshot_plasma", 10},
-		[JMod.EZ_RESOURCE_TYPES.LEAD] = {"ent_aboot_ezshot_cannister", 20},
-		[JMod.EZ_RESOURCE_TYPES.TITANIUM] = {"ent_aboot_ezshot_angler", 10},
-		[JMod.EZ_RESOURCE_TYPES.COPPER] = {"ent_aboot_ezshot_copper", 10},
-		[JMod.EZ_RESOURCE_TYPES.URANIUM] = {"ent_aboot_ezshot_uranium", 10},
-		[JMod.EZ_RESOURCE_TYPES.SILVER] = {"ent_aboot_ezshot_silver", 10},
-		[JMod.EZ_RESOURCE_TYPES.GOLD] = {"ent_aboot_ezshot_gold", 10},
-		[JMod.EZ_RESOURCE_TYPES.PLATINUM] = {"ent_aboot_ezshot_platinum", 10},
-		[JMod.EZ_RESOURCE_TYPES.RUBBER] = {"ent_aboot_ezshot_rubber", 10},
-		[JMod.EZ_RESOURCE_TYPES.CERAMIC] = {"ent_aboot_ezshot_ceramic", 10},
-		[JMod.EZ_RESOURCE_TYPES.PAPER] = {"ent_jack_gmod_ezflareprojectile", 20},
-		[JMod.EZ_RESOURCE_TYPES.TUNGSTEN] = {"ent_aboot_ezshot_tungsten", 10},
-	}
 
 	function ENT:TryLoadResource(typ, amt)
 		if(amt <= 0)then return 0 end
 		local Time = CurTime()
 		if (self.NextRefillTime > Time) or (typ == "generic") then return 0 end
 		
-		if not IsValid(self.LoadedProjectileEnt) then
-			for shotType, shot in pairs(self.ResourcesToShot) do
-				if typ == shotType and amt >= shot[2] and self.ProjectileSpecs[shot[1]] then
-					if self:SpawnAndAttachProjectileClass(shot[1]) then
-						return shot[2]
-					end
-				end
-			end
-		end
-		
 		if typ == JMod.EZ_RESOURCE_TYPES.PROPELLANT then
-			local SpaceLeft = self.MaxPropellant - self.Propellant
+			local SpaceLeft = math.max(0, (self.CurrentPropellantPerShot or self.DefaultPropellantPerShot) - self.Propellant)
 			local ToLoad = math.min(amt, SpaceLeft)
 			
 			if ToLoad > 0 then
@@ -667,26 +521,16 @@ if SERVER then
 	end
 
 	function ENT:SetDesiredProjectileClass(projectileClass)
-		if not isstring(projectileClass) then 
+		if not(isstring(projectileClass)) or projectileClass == "" then
 			self.DesiredProjectileClass = ""
 			self:UpdateWireOutputs()
-			return 
-		end
-		if projectileClass == "" then
-			self.DesiredProjectileClass = ""
-			self:UpdateWireOutputs()
+			
 			return
 		end
 		if not self.ProjectileSpecs[projectileClass] then return end
 
 		self.DesiredProjectileClass = projectileClass
 		self:UpdateWireOutputs()
-	end
-
-	function ENT:TryLoadProjectileClass(projectileClass)
-		if not isstring(projectileClass) then return false end
-		if IsValid(self.LoadedProjectileEnt) then return false end
-		return self:SpawnAndAttachProjectileClass(projectileClass)
 	end
 
 	function ENT:GetLoadedProjectileType()
@@ -722,15 +566,25 @@ if SERVER then
 		end
 	end
 
+	function ENT:EjectPropellant()
+		local Amount = self.Propellant or 0
+		if Amount <= 0 then return end
+		JMod.MachineSpawnResource(self, JMod.EZ_RESOURCE_TYPES.PROPELLANT, Amount, self:OBBCenter(), Angle(0, 0, 0), self:OBBCenter(), 150)
+		self.Propellant = 0
+		self:UpdateWireOutputs()
+		self:SyncStateToClients()
+	end
+
 	function ENT:UnloadProjectile()
 		if not IsValid(self.LoadedProjectileEnt) then return end
+		self:EjectPropellant()
 		self:LaunchProjectile(true)
 	end
 
-	function ENT:LaunchEffects(launchPos, launchDir, launchForce, launchVelocity, isSupersonic)
+	function ENT:LaunchEffects()
 		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
 		local SelfPos = self:GetPos()
-		launchPos = launchPos or SelfPos + Up * self.BarrelLength + Forward * -10
+		local LaunchPos, LaunchDir = self:GetLaunchPos(), self:GetLaunchDir()
 
 		-- Enhanced cannon firing sound system
 		--self:EmitSound("snd_jack_metallicclick.ogg", 65, 90)
@@ -747,69 +601,76 @@ if SERVER then
 		
 		self:EmitSound(CannonFireSound, 160, FinalPitch, 200)
 		
-		-- Supersonic sound effects for distant players
-		--[[if true then
-			for _, Sply in player.Iterator() do
-				if IsValid(Sply) then
-					local Dist = SelfPos:Distance(Sply:GetPos())
-					
-					-- Only play for players within 6000 units (reasonable hearing distance)
-					if Dist >= 1300 then
-						local SoundDelay = Dist / 13500
-						timer.Simple(SoundDelay, function()
-							if IsValid(Sply) then
-								--print("Playing sound for player " .. Sply:GetName())
-								-- Calculate sound position offset towards cannon
-								local PlayerPos = Sply:EyePos()
-								local DirectionToCannon = (SelfPos - PlayerPos):GetNormalized()
-								local SoundPos = PlayerPos + DirectionToCannon * 64
-								--debugoverlay.Cross(SoundPos, 10, 1, Color(255, 0, 0), true)
-								local BoomPitch = FinalPitch
-								local BoomVolume = 100
-
-								sound.Play("snds_jack_gmod/ez_weapons/flintlock_musketoon.ogg", SoundPos, 50, BoomPitch, BoomVolume, CHAN_STATIC)
-								sound.Play(CannonFireSound, SoundPos, 50, BoomPitch * 0.9, BoomVolume * 0.75, CHAN_STATIC)
-							end
-						end)
-					end
-				end
-			end
-		end--]]
-		
 		local Poof = EffectData()
-		Poof:SetOrigin(launchPos)
-		Poof:SetNormal(launchDir)
+		Poof:SetOrigin(LaunchPos)
+		Poof:SetNormal(LaunchDir)
 		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
-		util.Effect("eff_aboot_throwables_bpcmuzzle", Poof, true, true)
-
-		--[[local Poof = EffectData()
-		Poof:SetOrigin(SelfPos + Up * -30 + Forward * -30)
-		Poof:SetNormal(-Forward)
-		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
-		util.Effect("eff_aboot_throwables_bpcexhaust", Poof, true, true)--]]
+		util.Effect("eff_aboot_bp_cannon_muzzle", Poof, true, true)
 		
-		if self.CurrentPropellantPerShot > 50 then
-			local ExplosionPos = launchPos + Up * 200
-			local ExplosionPower = 10 * (self.CurrentPropellantPerShot / 100)
+		if self.CurrentPropellantPerShot > self.TargetPropellant then
+			timer.Simple(.15, function()
+				if not IsValid(self) then return end
+				local Pos, Dir = self:GetLaunchPos(), self:GetLaunchDir()
+				local ExplosionPos = Pos + Dir * 300
+				local ExplosionPower = 10 * (self.CurrentPropellantPerShot / self.TargetPropellant)
 
-			--JMod.Sploom(ply, ExplosionPos, ExplosionPower, 180)
+				JMod.Sploom(JMod.GetEZowner(self), ExplosionPos, ExplosionPower, 180)
+			end)
 		end
 		
 		-- Minor screen shake
-		util.ScreenShake(launchPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
+		util.ScreenShake(LaunchPos, 100 * PropellantMultiplier, 10, .5 * PropellantMultiplier, 200, true)
 	end
 
-	function ENT:LaunchProjectile(unload, ply, forceMult)
+	function ENT:EjectCase()
+		if self.CaseModel then
+			self:SetCaseBodygroup("EMPTY")
+			local Pos = self:GetBonePosition(self:LookupBone(self.ProjectileBone))
+			local Case = ents.Create("prop_physics")
+			Case:SetModel(self.CaseModel)
+			Case:SetPos(Pos)
+			Case:SetAngles(self:GetAngles())
+			Case:SetCollisionGroup(COLLISION_GROUP_DEBRIS)
+			Case:Spawn()
+			Case:Activate()
+			timer.Simple(0, function()
+				Case:SetVelocity(self:GetPhysicsObject():GetVelocity() - self:GetLaunchDir() * 200)
+				--[[if IsValid(Case) and IsValid(self) then
+					local LaunchDir = self:GetLaunchDir()
+					Case:GetPhysicsObject():SetVelocity(self:GetPhysicsObject():GetVelocity() - LaunchDir * 200)
+				end--]]
+			end)
+			SafeRemoveEntityDelayed(Case, 10)
+		end
+	end
+
+	function ENT:ArmProjectile(projectile, ply)
+		if not IsValid(projectile) then return end
+		local ArmMethod = self.ProjectileSpecs[projectile:GetClass()].ArmMethod or projectile.ArmMethod
+		if ArmMethod and isfunction(projectile[ArmMethod]) then
+			projectile[ArmMethod](projectile, ply)
+		elseif isfunction(projectile.Arm) then
+			projectile:Arm(ply)
+		elseif isfunction(projectile.SetState) then
+			projectile:SetState(JMod.EZ_STATE_ON)
+		end	
+	end
+
+	function ENT:LaunchProjectile(unload, ply)
 		local Time = CurTime()
 
 		if not unload and self.NextLaunchTime and (self.NextLaunchTime >= Time) then return end
 
-		if not self.LoadedProjectileType or not IsValid(self.LoadedProjectileEnt) then return end
+		if not self.LoadedProjectileType or not IsValid(self.LoadedProjectileEnt) then 
+			self.EZlaunchableWeaponLoadTime = nil
+			
+			return 
+		end
 		local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
 
 		if not Specs then return end
 
-		if not unload and self.Propellant < self.CurrentPropellantPerShot then
+		if not unload and self:GetPowder() < self.CurrentPropellantPerShot then
 			self:EmitSound("snd_jack_metallicclick.ogg", 65, 100)
 
 			return
@@ -854,9 +715,9 @@ if SERVER then
 		end
 
 		local CannonBarrelCenter, CannonBarrelAng = self:GetLaunchPosAng()
-		local ProjectileCenter = LaunchedProjectile:LocalToWorld(LaunchedProjectile:OBBCenter()) + (Specs.LaunchOffset or vector_origin)
-		local LaunchPos = SelfPos + (CannonBarrelCenter - ProjectileCenter)
-		LaunchedProjectile:SetPos(LaunchPos or SelfPos)
+		local CenterPosOffset = LaunchedProjectile:GetPos() - LaunchedProjectile:LocalToWorld(LaunchedProjectile:OBBCenter())
+		local LaunchPos = self:GetLaunchPos() + CenterPosOffset
+		LaunchedProjectile:SetPos(LaunchPos)
 
 		local LaunchAngle = CannonBarrelAng or LaunchedProjectile:GetAngles()
 		local CannonPhys = self:GetPhysicsObject()
@@ -881,27 +742,17 @@ if SERVER then
 			if Specs.UsePropModel then
 				LaunchedProjectile:Ignite(10, 0)
 			else
-				if Specs.ArmMethod and LaunchedProjectile[Specs.ArmMethod] then
-					timer.Simple(Specs.ArmDelay or 0, function()
-						if IsValid(LaunchedProjectile) then
-							LaunchedProjectile[Specs.ArmMethod](LaunchedProjectile)
-						end
-					end)
-				elseif LaunchedProjectile.Arm then
-					timer.Simple(Specs.ArmDelay or 0, function()
-						if IsValid(LaunchedProjectile) then
-							LaunchedProjectile:Arm(ply)
-						end
-					end)
-				elseif LaunchedProjectile.SetState then
-					LaunchedProjectile:SetState(JMod.EZ_STATE_ON)
+				if Specs.ArmDelay then 
+					timer.Simple(Specs.ArmDelay, function() self:ArmProjectile(LaunchedProjectile, ply) end)
+				else
+					self:ArmProjectile(LaunchedProjectile, ply)
 				end
 			end
 
-			local CalculatedForce = self:CalculateForceCurve(self.CurrentPropellantPerShot)
+			local CalculatedForce = self:CalculateForceCurve(self:GetPowder())
 			local Spread = self.Spread or 0.01
-			local LaunchDir = (LaunchAngle:Up() + Right * math.Rand(-1, 1) * Spread + Forward * math.Rand(-1, 1) * Spread):GetNormalized()
-			local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1) * (forceMult or Vector(1, 1, 1))
+			local LaunchDir = self:GetLaunchDir()
+			local LaunchForce = LaunchDir * CalculatedForce * (Specs.ForceMult or 1)
 
 			local ProjectileMass = LaunchPhys:GetMass()
 			local LaunchForceLength = LaunchForce:Length()
@@ -931,53 +782,32 @@ if SERVER then
 					end
 
 					JModBallistics.CreateProjectileTracker(
-						self, 
 						LaunchedProjectile, 
-						LaunchPhys, 
-						LaunchDir, 
+						(LaunchDir * LaunchVelocity), 
 						HadMotion, 
-						LaunchVelocity, 
-						MaxVelocity, 
-						HullSize
+						HullSize,
+						{self, LaunchedProjectile}
 					)
 				end
 				debugoverlay.Cross(CannonBarrelCenter, 10, 5, Color(229, 255, 0), true)
+			else
+				LaunchPhys:ApplyForceCenter(LaunchForce)
 			end
-			LaunchPhys:ApplyForceCenter(LaunchForce)
 			self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
-			self.Propellant = self.Propellant - self.CurrentPropellantPerShot
+			self.Propellant = 0
 			self:UpdateWireOutputs()
-
-			if self.HasRocketMotor and not Specs.NoRocketMotor then
-				local RocketMotor = ents.Create("ent_jack_gmod_ezrocketmotor")
-				RocketMotor:SetPos(CannonBarrelCenter)
-				RocketMotor:SetAngles(self:GetAngles())
-				RocketMotor:Spawn()
-				RocketMotor:Activate()
-				RocketMotor:SetParent(LaunchedProjectile)
-				RocketMotor.StuckTo = LaunchedProjectile
-
-				timer.Simple(.5, function()
-					if IsValid(RocketMotor) and IsValid(LaunchedProjectile) then
-						LaunchedProjectile:SetAngles(LaunchAngle)
-						RocketMotor:Launch()
-						RocketMotor.ThrustStuckTo = true
-					end
-				end)
-				self.HasRocketMotor = false
-			end
-
 			self:LaunchEffects(LaunchPos, LaunchDir, LaunchForce, LaunchVelocity, IsSupersonic)
 		end
 
 		self.LoadedProjectileType = nil
 		self.PropModel = nil
-		self.EZlaunchableWeaponLoadTime = CurTime()
+		self.EZlaunchableWeaponLoadTime = nil
 		if IsValid(LaunchedProjectile) then
 			LaunchedProjectile.EZalreadyLoaded = false
 		end
 
+		self.NextIdle = Time + 1
 		timer.Simple(0.5, function()
 			if IsValid(self) then
 				self:UpdateWireOutputs()
@@ -988,8 +818,14 @@ if SERVER then
 					self:ResetSequence(OpenSeqID)
 					local ExtractSeqID, ExtractSeqLength = self:LookupSequence(self.ExtractSequence)
 					if ExtractSeqLength > 0 then
+						self:SetCaseBodygroup("EJECTING")
 						self:ResetSequence(ExtractSeqID)
 						self.NextIdle = CurTime() + ExtractSeqLength
+						timer.Simple(ExtractSeqLength - 0.1, function()
+							if IsValid(self) then
+								self:EjectCase()
+							end
+						end)
 					else
 						self.NextIdle = CurTime() + OpenSeqLength
 					end
@@ -1100,6 +936,7 @@ if SERVER then
 		
 		-- Reduce durability based on damage
 		self.Durability = (self.Durability or self.MaxDurability) - damage
+		self:EmitSound("Canister.ImpactHard", 65, 90)
 		self:UpdateWireOutputs()
 		
 		-- Check if cannon should blow up from damage
@@ -1197,7 +1034,12 @@ if SERVER then
 			else
 				self:ResetSequence(self.IdleEmptySequence)
 			end
-			self.NextIdle = nil
+			self.NextIdle = Time + 1
+		elseif self.ProjectileBone and IsValid(self.LoadedProjectileEnt) then
+			local bonePos, boneAng = self:GetBonePosition(self:LookupBone(self.ProjectileBone))
+			local Specs = self.ProjectileSpecs[self.LoadedProjectileType]
+			local LaunchOffset = Specs.LaunchOffset or vector_origin
+			self.LoadedProjectileEnt:SetLocalPos(self:WorldToLocal(bonePos) + LaunchOffset)
 		end
 		self:NextThink(Time)
 		return true
@@ -1296,7 +1138,7 @@ elseif CLIENT then
 		
 		-- Override breech animation based on propellant availability
 		if self.Propellant and self.CurrentPropellantPerShot then
-			if self.Propellant >= self.CurrentPropellantPerShot then
+			if self:GetPowder() >= self.CurrentPropellantPerShot then
 				self.BreechTargetSlide = 0
 			else
 				self.BreechTargetSlide = 20

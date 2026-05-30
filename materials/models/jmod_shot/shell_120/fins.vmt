@@ -1,0 +1,13 @@
+VertexLitGeneric
+{
+	$basetexture "models/jmod_shot/shell_120/fins_basecolor"
+	$bumpmap "models/jmod_shot/shell_120/fins_normal"
+	$surfaceprop Metal
+
+	$envmap "env_cubemap"
+	$basealphaenvmapmask 1
+
+	$envmapmasktint "[.75 .75 .75]"
+	$notint 1
+	surfaceprop metal
+}

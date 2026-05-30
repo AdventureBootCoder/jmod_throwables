@@ -1,6 +1,8 @@
 -- AdventureBoots 2026
 JModBallistics = JModBallistics or {}
 
+
+-- WIP
 function JModBallistics.CalculateEstimatedRange(startPos, ent, mass, force, launchDir, maxTime, timeStep)
 	local timeStep = math.max(0.01, timeStep) --or GetConVar(""):GetFloat())
 	local ent = IsValid(ent) and ent or nil
@@ -92,14 +94,19 @@ function JModBallistics.CalculateEstimatedRange(startPos, ent, mass, force, laun
 end
 
 if SERVER then
-	function JModBallistics.CreateProjectileTracker(launcher, projectile, phys, launchDir, hadMotion, initialVelocity, maxVelLimit, hullSize)
+	function JModBallistics.CreateProjectileTracker(projectile, launchVector, hadMotion, hullSize, filter)
 		local timerName = "JMod_EZCannon_Tracker_" .. projectile:EntIndex()
+
+		local phys = projectile:GetPhysicsObject()
+		if not IsValid(phys) then return end
+		filter = filter or {projectile}
 		
 		-- Get server tick rate for consistent step timing
 		local tickRate = engine.TickInterval()
+		local maxVelLimit = GetConVar("sv_maxvelocity"):GetFloat()
 		
 		-- Initialize velocity tracking (as a vector)
-		local currentVelVector = launchDir * initialVelocity
+		local currentVelVector = launchVector
 		
 		-- Get projectile center offset from origin (local space)
 		local projectileCenterLocal = projectile:OBBCenter()
@@ -133,26 +140,22 @@ if SERVER then
 				endpos = nextCenterPos,
 				mins = -hullSize * 0.5,
 				maxs = hullSize * 0.5,
-				filter = {launcher, projectile}
+				filter = filter
 			})
+
+			-- Calculate origin position from center position
+			-- Get current center offset in world space (accounts for rotation)
+			local currentProjectileCenter = projectile:LocalToWorld(projectileCenterLocal)
+			local currentProjectilePos = projectile:GetPos()
+			local centerOffsetWorld = currentProjectileCenter - currentProjectilePos
 			
 			if tr.Hit then
 				-- Hit detected at center position
 				local hitCenterPos = tr.HitPos
-				
-				-- Calculate current center offset in world space
-				local currentProjectileCenter = projectile:LocalToWorld(projectileCenterLocal)
-				local currentProjectilePos = projectile:GetPos()
-				local centerOffsetWorld = currentProjectileCenter - currentProjectilePos
-				
-				-- Set entity position so its center is at the hit position
-				local hitOriginPos = hitCenterPos - centerOffsetWorld
-				
+
 				debugoverlay.Cross(hitCenterPos, 10, 5, Color(255, 0, 0), true)
 				debugoverlay.Line(currentCenterPos, hitCenterPos, 5, Color(255, 0, 0), true)
 				debugoverlay.Box(hitCenterPos, -hullSize * 0.5, hullSize * 0.5, 5, Color(255, 0, 0))
-				
-				projectile:SetPos(hitOriginPos)
 				
 				if hadMotion then
 					phys:EnableMotion(true)
@@ -164,16 +167,11 @@ if SERVER then
 				else
 					phys:SetVelocity(nextVelVector)
 				end
+
 				timer.Remove(timerName)
+
 				return
 			end
-			
-			-- Calculate origin position from center position
-			-- Get current center offset in world space (accounts for rotation)
-			local currentProjectileCenter = projectile:LocalToWorld(projectileCenterLocal)
-			local currentProjectilePos = projectile:GetPos()
-			local centerOffsetWorld = currentProjectileCenter - currentProjectilePos
-			
 			-- Set origin position so center ends up at nextCenterPos
 			local nextOriginPos = nextCenterPos - centerOffsetWorld
 			

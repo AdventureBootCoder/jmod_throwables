@@ -52,7 +52,7 @@ if SERVER then
 			SparkleEffect:SetOrigin(self:GetPos() + VectorRand() * 10)
 			SparkleEffect:SetScale(0.5)
 			SparkleEffect:SetNormal(Vector(0, 0, 1))
-			util.Effect("eff_aboot_throwables_silver_sparkle", SparkleEffect, true, true)
+			util.Effect("eff_aboot_silver_sparkle", SparkleEffect, true, true)
 		end
 		
 		-- Elegant trail sound
@@ -82,7 +82,7 @@ if SERVER then
 				SparkleEffect:SetOrigin(Pos + VectorRand() * 100)
 				SparkleEffect:SetScale(1)
 				SparkleEffect:SetNormal(Vector(0, 0, 1))
-				util.Effect("eff_aboot_throwables_silver_sparkle", SparkleEffect, true, true)
+				util.Effect("eff_aboot_silver_sparkle", SparkleEffect, true, true)
 			end)
 		end
 		

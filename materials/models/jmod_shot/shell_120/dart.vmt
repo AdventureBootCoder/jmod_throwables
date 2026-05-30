@@ -1,0 +1,15 @@
+VertexLitGeneric
+{
+	$basetexture "../addons/jmod_ballistics/materials/models/jmod_shot/shell_120/dart_BaseColor"
+	$bumpmap "../addons/jmod_ballistics/materials/models/jmod_shot/shell_120/dart_Normal"
+	$surfaceprop Metal
+
+	$envmap "env_cubemap"
+	$basealphaenvmapmask 1
+
+	$color2 "[0.97 0.97 0.97]"
+
+	$envmapmasktint "[.75 .75 .75]"
+	$notint 1
+	surfaceprop metal
+}

@@ -1,0 +1,10 @@
+VertexLitGeneric
+{
+	$basetexture "models/jmod_cannons/cannon_med_diffuse"
+	$bumpmap "models/jmod_cannons/cannon_med_normal"
+
+//	$envmap "env_cubemap"
+//	$normalmapalphaenvmapmask 1
+
+	$blendtintbybasealpha 1
+}

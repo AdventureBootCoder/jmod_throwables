@@ -1,0 +1,21 @@
+VertexLitGeneric
+{
+	"$basetexture"	"models\jmod_shot\shell_120\case_diffuse"
+	"$bumpmap"	"models\jmod_shot\shell_120\case_normal"
+
+	"$blendTintByBaseAlpha" "1"
+
+	"$normalmapalphaenvmapmask" "1"
+	"$envmapmasktint"	"[.75 .75 .75]"
+
+	"surfaceprop"	"metal"
+
+//	$phong 1
+//	$phongboost	5
+//	$phongalbedotint 1
+//	$phongfresnelranges	"[0.8 0.8 0.8]"
+
+//	$rimlight 1
+//	$rimlightexponent 50
+//	$rimlightboost 0.05
+}
