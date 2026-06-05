@@ -21,6 +21,8 @@ ENT.CollisionSpeedThreshold = 1000
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0.1
 ENT.CollisionDirection = nil
+ENT.AeroDragAmount = 0
+
 ENT.FuseTime = .5
 ENT.ImpactDetonation = false
 ENT.TrailEffectScale = 3
@@ -249,6 +251,10 @@ if SERVER then
 		end
 		if self.ImpactDetonation and self.DetonateTime and self.DetonateTime < CurTime() then
 			self:Detonate()
+		end
+		if self.CollisionDirection and self.AeroDragAmount then
+			local Direction = -(self:GetPos() - self:LocalToWorld(self.CollisionDirection)):GetNormalized()
+			JMod.AeroDrag(self, Direction, self.AeroDragAmount)
 		end
 		self:NextThink(CurTime() + .06)
 		return true

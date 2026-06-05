@@ -181,6 +181,10 @@ if JModBallistics.ProjectilesInitialized then
 	UpdateProjectileSpecs()
 end
 
+JModBallistics.NETWORK_INDEX = {
+	CANNON_COMMAND = {OPEN = 1, FIRE = 2, UNLOAD = 3, SETPROPLELLETPERSHOT = 4, SETDESIREDPROJECTILECLASS = 5, SETAUTOLOADING = 6, STATESYNC = 7},
+}
+
 if SERVER then
 	util.AddNetworkString("JMod_EZAutoloader_ModifyConnections")
 
@@ -220,8 +224,7 @@ if SERVER then
 
 	net.Receive("JMod_EZCannon_Command", function(len, ply)
 		local cannon = net.ReadEntity()
-		local command = net.ReadString()
-		
+		local command = net.ReadUInt(4)
 		-- Security checks
 		if not IsValid(cannon) then return end
 		if not IsValid(ply) or not ply:IsPlayer() then return end
@@ -237,31 +240,31 @@ if SERVER then
 		end
 		
 		-- Process commands
-		if command == "open" then
+		if command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.OPEN then
 			net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
-				net.WriteString("open")
-				net.WriteString(IsValid(cannon.LoadedProjectileEnt) and (cannon.LoadedProjectileType or "") or "")
+				net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.OPEN, 4)
+				net.WriteEntity(IsValid(cannon.LoadedProjectileEnt) and cannon.LoadedProjectileEnt or NULL)
 				net.WriteUInt(cannon.Propellant or 0, 8)
 				net.WriteUInt(cannon.CurrentPropellantPerShot or 20, 8)
 				net.WriteString(cannon:GetDesiredProjectileClass() or "")
 			net.Send(ply)
-		elseif command == "fire" then
-			if IsValid(cannon.LoadedProjectileEnt) and cannon.LoadedProjectileType then
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.FIRE then
+			if IsValid(cannon.LoadedProjectileEnt) then
 				cannon:LaunchProjectile(false, ply)
 			end
-		elseif command == "unload" then
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.UNLOAD then
 			cannon:UnloadProjectile()
-		elseif command == "setpropellant" then
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETPROPLELLETPERSHOT then
 			local propellant = net.ReadUInt(8)
 			-- Validate propellant value
 			cannon.CurrentPropellantPerShot = math.Clamp(propellant, 1, cannon.MaxPropellant or 100)
 			cannon:UpdateWireOutputs()
-		elseif command == "setdesiredprojectile" then
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETDESIREDPROJECTILECLASS then
 			local projectileClass = net.ReadString()
 			cannon:SetDesiredProjectileClass(projectileClass)
 			cannon:SyncStateToClients()
-		elseif command == "setautoloading" then
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETAUTOLOADING then
 			local isAutoLoading = net.ReadBool()
 			cannon:SetIsAutoLoading(isAutoLoading)
 		end
@@ -428,26 +431,23 @@ if CLIENT then
 	-- Networking receiver for opening GUI
 	net.Receive("JMod_EZCannon_Command", function()
 		local cannon = net.ReadEntity()
-		local command = net.ReadString()
+		if not IsValid(cannon) then return end
+		local command = net.ReadUInt(4)
 		
-		if command == "open" then
+		if command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.OPEN then
+			cannon.LoadedProjectileEnt = net.ReadEntity()
+			cannon.LoadedProjectileType = IsValid(cannon.LoadedProjectileEnt) and cannon.LoadedProjectileEnt:GetClass() or ""
+			cannon.Propellant = net.ReadUInt(8)
+			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
+			cannon.ProjectileMass = net.ReadUInt(16)
+			cannon.DesiredProjectileClass = net.ReadString()
+			JMod_EZCannon_OpenGUI(cannon)
+		elseif command == JModBallistics.NETWORK_INDEX.CANNON_COMMAND.STATESYNC then
 			cannon.LoadedProjectileType = net.ReadString()
 			cannon.Propellant = net.ReadUInt(8)
 			cannon.CurrentPropellantPerShot = net.ReadUInt(8)
 			cannon.ProjectileMass = net.ReadUInt(16)
 			cannon.DesiredProjectileClass = net.ReadString()
-
-			if IsValid(cannon) then
-				JMod_EZCannon_OpenGUI(cannon)
-			end
-		elseif command == "state_sync" then
-			if IsValid(cannon) then
-				cannon.LoadedProjectileType = net.ReadString()
-				cannon.Propellant = net.ReadUInt(8)
-				cannon.CurrentPropellantPerShot = net.ReadUInt(8)
-				cannon.ProjectileMass = net.ReadUInt(16)
-				cannon.DesiredProjectileClass = net.ReadString()
-			end
 		end
 	end)
 
@@ -637,7 +637,7 @@ if CLIENT then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
 				net.Start("JMod_EZCannon_Command")
 					net.WriteEntity(cannon)
-					net.WriteString("setdesiredprojectile")
+					net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETDESIREDPROJECTILECLASS, 4)
 					net.WriteString(data or "")
 				net.SendToServer()
 			end
@@ -655,7 +655,7 @@ if CLIENT then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
 				net.Start("JMod_EZCannon_Command")
 					net.WriteEntity(cannon)
-					net.WriteString("setautoloading")
+					net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETAUTOLOADING, 4)
 					net.WriteBool(val)
 				net.SendToServer()
 			end
@@ -700,7 +700,7 @@ if CLIENT then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_big.ogg")
 				net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
-				net.WriteString("fire")
+				net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.FIRE, 4)
 				net.SendToServer()
 				frame:Close()
 			else
@@ -732,7 +732,7 @@ if CLIENT then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
 				net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
-				net.WriteString("unload")
+				net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.UNLOAD, 4)
 				net.SendToServer()
 				frame:Close()
 			end
@@ -766,7 +766,7 @@ if CLIENT then
 				cannon.CurrentPropellantPerShot = math.floor(value)
 				net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
-				net.WriteString("setpropellant")
+				net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETPROPLELLETPERSHOT, 4)
 				net.WriteUInt(math.floor(value), 8)
 				net.SendToServer()
 				

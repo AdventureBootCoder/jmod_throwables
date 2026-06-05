@@ -14,6 +14,8 @@ ENT.CollisionSpeedThreshold = 200
 ENT.CollisionRequiresArmed = true
 ENT.CollisionDelay = 0
 ENT.CollisionDirection = Vector(-1, 0, 0)
+ENT.AeroDragAmount = .1
+
 ENT.FuseTime = 30
 ENT.TrailEffectScale = 3
 ENT.TrailSoundVolume = 100
@@ -36,13 +38,15 @@ if SERVER then
 
 	function ENT:Launch(ply, force)
 		self:SetModel(self.ShellModel)
-		//self:PhysicsInit(SOLID_VPHYSICS)
-		self:GetPhysicsObject():SetMass(10)
-		if force then
-			self:GetPhysicsObject():ApplyForceCenter(self:GetUp() * 10000)
-		end
 		self:SetBodygroup(1, 1)
 		self:SetIsArmed(true)
+		//self:PhysicsInit(SOLID_VPHYSICS)
+		if IsValid(self:GetPhysicsObject()) then
+			self:GetPhysicsObject():SetMass(10)
+			if force then
+				self:GetPhysicsObject():ApplyForceCenter(self:GetUp() * 10000)
+			end
+		end
 	end
 
 	function ENT:Detonate(collisionData)
@@ -64,6 +68,7 @@ if SERVER then
 		util.BlastDamageInfo(BlastDmg, Pos, 300)
 		JMod.FragSplosion(self, Pos, 250, 500, 1000, Attacker, nil, nil, nil, true)
 		JMod.WreckBuildings(self, Pos, 1, 1, true)
+		self:EmitSound("snd_jack_fragsplodeclose.ogg", 90, 80)
 		-- Do some effects
 		timer.Simple(.1, function()
 			ParticleEffect("50lb_air", Pos, Dir:Angle())

@@ -6,7 +6,7 @@ end
 ENT.Type = "anim"
 ENT.Author = "Jackarunda, AdventureBoots"
 ENT.Category = "JMod - EZ Misc."
-ENT.Information = "EZ method for loading anything"
+ENT.Information = "EZ method for launching explosives"
 ENT.PrintName = "EZ Cannon"
 ENT.Spawnable = true
 ENT.AdminSpawnable = false
@@ -16,7 +16,7 @@ ENT.JModPreferredCarryAngles = Angle(90, 0, 0)
 ENT.EZcolorable = false
 ENT.EZlowFragPlease = true
 ENT.EZbuoyancy = .3
-ENT.JModHighlyFlammableFunc = "LaunchProjectile"
+--ENT.JModHighlyFlammableFunc = "LaunchProjectile"
 ENT.Mass = 300
 ENT.Model = "models/props_phx/misc/smallcannon.mdl"
 ---
@@ -226,6 +226,7 @@ if SERVER then
 			end
 		end)
 	end
+
 	function ENT:UpdateWireOutputs(outputName)
 		if istable(WireLib) then
 			-- Calculate current muzzle velocity
@@ -246,7 +247,7 @@ if SERVER then
 	function ENT:SyncStateToClients()
 		net.Start("JMod_EZCannon_Command")
 		net.WriteEntity(self)
-		net.WriteString("state_sync")
+		net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.STATESYNC, 4)
 		net.WriteString(IsValid(self.LoadedProjectileEnt) and (self.LoadedProjectileType or "") or "")
 		net.WriteUInt(self.Propellant or 0, 8)
 		net.WriteUInt(self.CurrentPropellantPerShot or 20, 8)
@@ -595,7 +596,7 @@ if SERVER then
 		local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
 		
 		-- Calculate pitch variation based on propellant
-		local BasePitch = 70
+		local BasePitch = 60
 		local PitchVariation = math.random(-10, 10)
 		local FinalPitch = math.Clamp(BasePitch + PitchVariation, 50, 100)
 		
@@ -1006,23 +1007,33 @@ if SERVER then
 	end
 
 	function ENT:Use(activator)
-		if IsValid(activator) then
+		if not IsValid(activator) then return end
+		if activator:IsPlayer() then
 			JMod.Hint(activator, "Projectile pod")
 			JMod.SetEZowner(self, activator)
+
+			local Tr = activator:GetEyeTrace()
+			if not (Tr.Hit and IsValid(Tr.Entity) and Tr.Entity == self and (Tr.HitPos - Tr.StartPos):Length() < 100) then
+				
+				return
+			end
+
+			print(Tr.HitBox, Tr.HitGroup)
 		end
 
 		if JMod.IsAltUsing(activator) then
+			self:LaunchProjectile(false, activator)
+		else
 			-- Open GUI instead of immediately firing
 			net.Start("JMod_EZCannon_Command")
 			net.WriteEntity(self)
-			net.WriteString("open")
-			net.WriteString(IsValid(self.LoadedProjectileEnt) and (self.LoadedProjectileType or "") or "")
+			net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.OPEN, 4)
+			net.WriteEntity(IsValid(self.LoadedProjectileEnt) and self.LoadedProjectileEnt or NULL)
 			net.WriteUInt(self.Propellant, 8)
 			net.WriteUInt(self.CurrentPropellantPerShot, 8)
 			net.WriteUInt(self.ProjectileMass or 0, 16)
+			net.WriteString(self:GetDesiredProjectileClass() or "")
 			net.Send(activator)
-		else
-			self:LaunchProjectile(false, activator)
 		end
 	end
 
