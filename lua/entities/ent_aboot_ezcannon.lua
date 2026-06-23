@@ -582,7 +582,7 @@ if SERVER then
 		self:LaunchProjectile(true)
 	end
 
-	function ENT:LaunchEffects()
+	function ENT:LaunchEffects(launchVelocity)
 		local Up, Forward, Right = self:GetUp(), self:GetForward(), self:GetRight()
 		local SelfPos = self:GetPos()
 		local LaunchPos, LaunchDir = self:GetLaunchPos(), self:GetLaunchDir()
@@ -593,7 +593,7 @@ if SERVER then
 		
 		-- Calculate sound volume based on propellant amount
 		local BaseSoundLevel = 70
-		local PropellantMultiplier = self.CurrentPropellantPerShot / self.DefaultPropellantPerShot
+		local PropellantMultiplier = self:GetPowder() / self.MaxPropellant
 		
 		-- Calculate pitch variation based on propellant
 		local BasePitch = 60
@@ -605,7 +605,8 @@ if SERVER then
 		local Poof = EffectData()
 		Poof:SetOrigin(LaunchPos)
 		Poof:SetNormal(LaunchDir)
-		Poof:SetScale(1 * (self.CurrentPropellantPerShot / 100))
+		Poof:SetScale(PropellantMultiplier)
+		Poof:SetMagnitude(launchVelocity)
 		util.Effect("eff_aboot_bp_cannon_muzzle", Poof, true, true)
 		
 		if self.CurrentPropellantPerShot > self.TargetPropellant then
@@ -796,9 +797,9 @@ if SERVER then
 			end
 			self:GetPhysicsObject():ApplyForceCenter(-LaunchForce)
 
+			self:LaunchEffects(LaunchVelocity)
 			self.Propellant = 0
 			self:UpdateWireOutputs()
-			self:LaunchEffects(LaunchPos, LaunchDir, LaunchForce, LaunchVelocity, IsSupersonic)
 		end
 
 		self.LoadedProjectileType = nil

@@ -694,7 +694,7 @@ if CLIENT then
 		
 		fireButton.DoClick = function()
 			if IsValid(cannon) and cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-				if cannon:GetPowder() < cannon.CurrentPropellantPerShot then
+				if cannon:GetPowder() <= 0 then
 					surface.PlaySound("snds_jack_gmod/ez_gui/miss.ogg")
 					notification.AddLegacy("Not enough propellant!", NOTIFY_ERROR, 2)
 					return
