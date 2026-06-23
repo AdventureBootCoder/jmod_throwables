@@ -21,7 +21,7 @@ ENT.MaxPropellant = 50
 ENT.TargetPropellant = 25
 ENT.TargetPercentage = .8
 --ENT.PropellantForce = 5000
-ENT.MaxPropellantForce = 500000
+ENT.MaxPropellantForce = 1000000 * 2
 ENT.BarrelLength = 45
 ENT.BreachOffset = -45
 ENT.LaunchDelay = 1
@@ -55,7 +55,7 @@ function ENT:GetLaunchDir()
 end
 
 function ENT:GetLaunchPos()
-	return self:GetPos() + self:GetLaunchDir() * self.BarrelLength
+	return self:GetAttachment(self:LookupAttachment(self.MuzzleAttachment)).Pos
 end
 
 if CLIENT then

@@ -108,7 +108,8 @@ JModBallistics.ProjectileSpecs["ent_aboot_ezcannon"] = {
 JModBallistics.ProjectileSpecs["ent_aboot_ezcannon_small"] = {
 	types = {
 		["prop_physics"] = {
-			UsePropModel = true
+			UsePropModel = true,
+			DisplayName = "Prop Physics"
 		},
 		["ent_aboot_ezshot_shell"] = {
 			PowderAdd = 25,
@@ -118,40 +119,50 @@ JModBallistics.ProjectileSpecs["ent_aboot_ezcannon_small"] = {
 		},
 		["ent_jack_gmod_ezherocket"] = {
 			ArmDelay = .2,
-			PowderAdd = 50,
+			PowderAdd = 100,
 			Angles = Angle(0, 0, 90),
-			LaunchOffset = Vector(-30, 1.5, 0)
+			LaunchOffset = Vector(-30, 1.5, 0),
+			DisplayName = "HE Rocket"
 		},
 		["ent_jack_gmod_ezheatrocket"] = {
 			ArmDelay = .2,
-			PowderAdd = 50,
+			PowderAdd = 100,
 			Angles = Angle(0, 0, 90),
-			LaunchOffset = Vector(-30, 1.5, 0)
+			LaunchOffset = Vector(-30, 1.5, 0),
+			DisplayName = "HEAT Rocket"
 		},
 		["ent_jack_gmod_ezstickynade"] = {
-			Angles = Angle(180, 0, 0)
+			Angles = Angle(180, 0, 0),
+			DisplayName = "Sticky Grenade"
 		},
 		["ent_jack_gmod_ezfragnade"] = {
-			ArmDelay = 0
+			ArmDelay = 0,
+			DisplayName = "Frag Grenade"
 		},
 		["ent_jack_gmod_ezimpactnade"] = {
 			Angles = Angle(180, 0, 0),
-			LaunchOffset = Vector(-4.25, 0, -3),
+			LaunchOffset = Vector(1, 0, 0),
+			DisplayName = "Impact Grenade"
 		},
 		["ent_jack_gmod_ezfirenade"] = {
-			ArmDelay = .05
+			ArmDelay = .05,
+			DisplayName = "Incendiary Grenade"
 		},
 		["ent_jack_gmod_ezflashbang"] = {
-			ArmDelay = .05
+			ArmDelay = .05,
+			DisplayName = "Flashbang"
 		},
 		["ent_jack_gmod_ezsmokegrenade"] = {
-			ArmDelay = .05
+			ArmDelay = .05,
+			DisplayName = "Smoke Grenade"
 		},
 		["ent_jack_gmod_ezroadflare"] = {
-			ArmDelay = .5
+			ArmDelay = .5,
+			DisplayName = "Road Flare"
 		},
 		["ent_jack_gmod_ezflareprojectile"] = {
-			ForceMult = .1
+			ForceMult = .1,
+			DisplayName = "Flare Projectile"
 		}
 	}
 }
@@ -451,19 +462,23 @@ if CLIENT then
 		end
 	end)
 
+	surface.CreateFont("JMod_EZCannon_Body", {font = "Tahoma", size = 16, weight = 500, antialias = true})
+	surface.CreateFont("JMod_EZCannon_Header", {font = "Tahoma", size = 18, weight = 800, antialias = true})
+
 	-- GUI function
 	function JMod_EZCannon_OpenGUI(cannon)
 		if not IsValid(cannon) then return end
 		local CannonClass = cannon:GetClass()
 		local ProjectileSpecs = JModBallistics.ProjectileSpecs[CannonClass].types
 		
-		local frame = vgui.Create("DFrame")
-		frame:SetSize(400, 400)
+		local frame = IsValid(JMod_EZCannon_GUI) and JMod_EZCannon_GUI or vgui.Create("DFrame")
+		frame:SetSize(280, 450)
 		frame:Center()
 		frame:SetTitle("EZ Cannon Control")
 		frame:MakePopup()
 		frame:SetDraggable(true)
 		frame:ShowCloseButton(true)
+		frame:DockPadding(8, 28, 8, 8)
 		
 		function frame:Paint()
 			EZBlurBackground(frame)
@@ -479,159 +494,155 @@ if CLIENT then
 			surface.PlaySound("snds_jack_gmod/ez_gui/menu_close.ogg")
 		end
 		
-		-- Status panel (left side)
-		local statusPanel = vgui.Create("DPanel", frame)
-		statusPanel:SetPos(10, 30)
-		statusPanel:SetSize(180, 100)
-		
-		function statusPanel:Paint(w, h)
-			surface.SetDrawColor(0, 0, 0, 100)
-			surface.DrawRect(0, 0, w, h)
+		local headerColor = Color(255, 220, 120, 255)
+		local bodyColor = Color(255, 255, 255, 220)
+
+		-- Helper: format muzzle velocity preview from a propellant-to-load value
+		local function FormatVelText(propLoad)
+			if not (cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "") then
+				return "No projectile loaded", Color(150, 150, 150, 220)
+			end
+			local mass = cannon.ProjectileMass or 0
+			if mass <= 0 then
+				return "No mass data", Color(255, 165, 0, 220)
+			end
+			local specs = ProjectileSpecs[cannon.LoadedProjectileType]
+			local powderAdd = (specs and specs.PowderAdd) or 0
+			local power = (propLoad or cannon.CurrentPropellantPerShot or 0) + powderAdd
+			local vel = cannon:CalculateForceCurve(power) / mass
+			local ms = math.Round(vel * 0.01905)
+			local us = math.Round(vel)
+			local quality = math.Clamp(vel / 5000, 0, 1)
+			return ms .. " m/s (" .. us .. " u/s)", JMod.GoodBadColor(quality, 220)
 		end
-		
-		local infoLabel = vgui.Create("DLabel", statusPanel)
-		infoLabel:SetPos(10, 10)
-		infoLabel:SetSize(160, 80)
-		
-		-- Get display name for loaded projectile
-		local loadedDisplayName = "None"
+
+		-- Helper: docked, horizontally-centered single-line label that auto-sizes its height
+		local function MakeLabel(parent, font, color)
+			local l = vgui.Create("DLabel", parent)
+			l:Dock(TOP)
+			l:DockMargin(0, 0, 0, 2)
+			l:SetFont(font)
+			l:SetTextColor(color)
+			l:SetContentAlignment(5)
+			l:SetAutoStretchVertical(true)
+			return l
+		end
+
+		-- Helper: docked section panel that auto-sizes its height to its children
+		local function MakeSection(dock)
+			local p = vgui.Create("DPanel", frame)
+			p:Dock(dock)
+			p:DockMargin(0, 0, 0, 8)
+			p:DockPadding(8, 6, 8, 6)
+			p.Paint = function(_, w, h)
+				surface.SetDrawColor(0, 0, 0, 100)
+				surface.DrawRect(0, 0, w, h)
+			end
+			if dock ~= FILL then
+				p.PerformLayout = function(s) s:SizeToChildren(false, true) end
+			end
+			return p
+		end
+
+		-- ===== Top: Calculation Data =====
+		local calcPanel = MakeSection(TOP)
+
+		local calcHeader = MakeLabel(calcPanel, "JMod_EZCannon_Header", headerColor)
+		calcHeader:SetText("Calculation Data")
+
+		local massLabel = MakeLabel(calcPanel, "JMod_EZCannon_Body", bodyColor)
+		massLabel:SetText("Mass: " .. math.max(0, cannon.ProjectileMass or 0) .. " kg")
+
+		local muzzleLabel = MakeLabel(calcPanel, "JMod_EZCannon_Body", bodyColor)
+		do
+			local velText, velCol = FormatVelText(cannon.CurrentPropellantPerShot)
+			muzzleLabel:SetText("Muzzle Vel: " .. velText)
+			muzzleLabel:SetTextColor(velCol)
+		end
+
+		-- ===== Middle: Cannon Configuration =====
+		local cfgPanel = MakeSection(TOP)
+
+		local cfgHeader = MakeLabel(cfgPanel, "JMod_EZCannon_Header", headerColor)
+		cfgHeader:SetText("Cannon Configuration")
+
+		local loadedHeader = MakeLabel(cfgPanel, "JMod_EZCannon_Body", bodyColor)
+		loadedHeader:SetText("Loaded Projectile:")
+
 		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
 			local specs = ProjectileSpecs[cannon.LoadedProjectileType]
-			if specs and specs.DisplayName then
-				loadedDisplayName = specs.DisplayName
+			local primaryName
+			if cannon.LoadedProjectileType == "prop_physics" and IsValid(cannon.LoadedProjectileEnt) then
+				primaryName = cannon.LoadedProjectileEnt:GetModel()
 			else
-				loadedDisplayName = cannon.LoadedProjectileType
+				primaryName = (specs and specs.DisplayName) or cannon.LoadedProjectileType
 			end
-		end
-		
-		infoLabel:SetText("Cannon Status:\n" .. 
-			"Loaded: " .. loadedDisplayName .. "\n" ..
-			"Powder: " .. cannon:GetPowder() .. " (charge " .. (cannon.Propellant or 0) .. "/" .. (cannon.MaxPropellant or 100) .. ")")
-		infoLabel:SetWrap(true)
-		infoLabel:SetTextColor(Color(255, 255, 255, 200))
-		
-		-- Muzzle velocity info panel (right side)
-		local velocityPanel = vgui.Create("DPanel", frame)
-		velocityPanel:SetPos(210, 30)
-		velocityPanel:SetSize(180, 100)
-		
-		function velocityPanel:Paint(w, h)
-			surface.SetDrawColor(0, 0, 0, 100)
-			surface.DrawRect(0, 0, w, h)
-		end
-		
-		local velocityLabel = vgui.Create("DLabel", velocityPanel)
-		velocityLabel:SetPos(10, 10)
-		velocityLabel:SetSize(160, 80)
-		
-		-- Calculate muzzle velocity on client side
-		local currentMuzzleVelocity = 0
-		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" and cannon.ProjectileMass and cannon.ProjectileMass > 0 then
-			local force = cannon:CalculateForceCurve(cannon:GetPowder())
-			currentMuzzleVelocity = force / cannon.ProjectileMass
-		end
-		
-		local velocityText = "Muzzle Velocity:\n"
-		local velocityColor = Color(255, 255, 255, 200)
-		if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-			if currentMuzzleVelocity > 0 then
-				-- Convert to more readable units (m/s)
-				local velocityMetersPerSec = math.Round(currentMuzzleVelocity * 0.01905)
-				velocityText = velocityText .. velocityMetersPerSec .. " m/s\n"
-				velocityText = velocityText .. "(" .. math.Round(currentMuzzleVelocity) .. " u/s)\n"
-				
-				-- Get display name for loaded projectile
-				local specs = ProjectileSpecs[cannon.LoadedProjectileType]
-				local projectileName = (specs and specs.DisplayName) or cannon.LoadedProjectileType
-				velocityText = velocityText .. "Mass: " .. cannon.ProjectileMass .. " kg"
-				
-				-- Color code based on velocity (higher velocity = greener)
-				local velocityQuality = math.Clamp(currentMuzzleVelocity / 5000, 0, 1) -- Normalize to 0-1 (5000 u/s = max quality)
-				velocityColor = JMod.GoodBadColor(velocityQuality, 200)
-			else
-				velocityText = velocityText .. "No mass data\n"
-				velocityText = velocityText .. "Cannot calculate"
-				velocityColor = Color(255, 165, 0, 200) -- Orange for no data
-			end
+			MakeLabel(cfgPanel, "JMod_EZCannon_Body", bodyColor):SetText(primaryName)
+			MakeLabel(cfgPanel, "JMod_EZCannon_Body", bodyColor):SetText("(" .. cannon.LoadedProjectileType .. ")")
 		else
-			velocityText = velocityText .. "No projectile\nloaded"
-			velocityColor = Color(150, 150, 150, 200) -- Gray when no projectile
+			MakeLabel(cfgPanel, "JMod_EZCannon_Body", bodyColor):SetText("None")
 		end
+
+		local loadedSpecs = ProjectileSpecs[cannon.LoadedProjectileType or ""]
+		local loadedPowderAdd = (loadedSpecs and loadedSpecs.PowderAdd) or 0
+		local powderLabel = MakeLabel(cfgPanel, "JMod_EZCannon_Body", bodyColor)
+		powderLabel:SetText("Total Powder: (" .. (cannon.Propellant or 0) .. " + " .. loadedPowderAdd .. ") / " .. (cannon.MaxPropellant or 100))
 		
-		velocityLabel:SetText(velocityText)
-		velocityLabel:SetWrap(true)
-		velocityLabel:SetTextColor(velocityColor)
-		
-		-- Propellant control panel
-		local controlPanel = vgui.Create("DPanel", frame)
-		controlPanel:SetPos(10, 140)
-		controlPanel:SetSize(380, 150)
-		
-		function controlPanel:Paint(w, h)
-			surface.SetDrawColor(0, 0, 0, 100)
-			surface.DrawRect(0, 0, w, h)
-		end
-		
-		local propellantLabel = vgui.Create("DLabel", controlPanel)
-		propellantLabel:SetPos(10, 10)
-		propellantLabel:SetSize(360, 20)
-		propellantLabel:SetText("Propellant per shot: " .. (cannon.CurrentPropellantPerShot or 20))
-		propellantLabel:SetTextColor(Color(255, 255, 255, 200))
-		
-		local slider = vgui.Create("DNumSlider", controlPanel)
-		slider:SetPos(10, 35)
-		slider:SetSize(360, 30)
-		slider:SetText("Propellant Amount")
+		-- ===== Buttons (pinned to bottom) =====
+		local buttonRow = vgui.Create("DPanel", frame)
+		buttonRow:Dock(BOTTOM)
+		buttonRow:SetPaintBackground(false)
+		buttonRow.PerformLayout = function(s) s:SizeToChildren(false, true) end
+
+		-- ===== Bottom: Controls (fills remaining space) =====
+		local controlsPanel = MakeSection(FILL)
+
+		local propellantLabel = MakeLabel(controlsPanel, "JMod_EZCannon_Body", bodyColor)
+		propellantLabel:SetText("Propellant To Load:")
+
+		local slider = vgui.Create("DNumSlider", controlsPanel)
+		slider:Dock(TOP)
+		slider:SetTall(30)
+		slider:DockMargin(-100, 0, 0, 6)
+		slider:SetText("")
 		slider:SetMin(1)
 		slider:SetMax(cannon.MaxPropellant or 100)
 		slider:SetValue(cannon.CurrentPropellantPerShot or 20)
 		slider:SetDecimals(0)
-		
-		-- Desired projectile selector
-		local projectileLabel = vgui.Create("DLabel", controlPanel)
-		projectileLabel:SetPos(10, 70)
-		projectileLabel:SetSize(360, 20)
-		projectileLabel:SetText("Desired Projectile Type:")
-		projectileLabel:SetTextColor(Color(255, 255, 255, 200))
-		
-		local projectileCombo = vgui.Create("DComboBox", controlPanel)
-		projectileCombo:SetPos(10, 90)
-		projectileCombo:SetSize(360, 25)
+		if IsValid(slider.Label) then slider.Label:SetFont("JMod_EZCannon_Body") end
 
-		-- Add all valid projectile types
+		local projectileLabel = MakeLabel(controlsPanel, "JMod_EZCannon_Body", bodyColor)
+		projectileLabel:SetText("Desired Projectile:")
+
+		local projectileCombo = vgui.Create("DComboBox", controlsPanel)
+		projectileCombo:Dock(TOP)
+		projectileCombo:SetTall(26)
+		projectileCombo:DockMargin(0, 0, 0, 6)
+		projectileCombo:SetFont("JMod_EZCannon_Body")
+
 		local projectileKeys = {}
 		for class, _ in pairs(ProjectileSpecs) do
 			table.insert(projectileKeys, class)
 		end
 		table.sort(projectileKeys)
-		
+
+		local noneChoice = true
 		for _, class in ipairs(projectileKeys) do
 			local specs = ProjectileSpecs[class]
 			local displayName = (specs and specs.DisplayName) or class
-			projectileCombo:AddChoice(displayName, class)
-		end
-
-		-- Add "None" option
-		projectileCombo:AddChoice("None", "")
-
-		-- Get current display name for desired projectile
-		local currentDisplayName = "None"
-		if cannon.DesiredProjectileClass and cannon.DesiredProjectileClass ~= "" then
-			local specs = ProjectileSpecs[cannon.DesiredProjectileClass]
-			if specs and specs.DisplayName then
-				currentDisplayName = specs.DisplayName
+			if cannon.DesiredProjectileClass and cannon.DesiredProjectileClass == class then
+				projectileCombo:AddChoice(displayName, class, true)
+				noneChoice = false
 			else
-				currentDisplayName = cannon.DesiredProjectileClass
+				projectileCombo:AddChoice(displayName, class)
 			end
 		end
-		projectileCombo:SetValue(currentDisplayName)
-		
-		-- Customize the dropdown menu to add scrollbar
+		projectileCombo:AddChoice(" None", "", noneChoice)
+
 		projectileCombo.OnMenuOpened = function(self, menu)
-			-- Set maximum height for the menu (will show scrollbar if content exceeds this)
 			menu:SetMaxHeight(200)
 		end
-		
+
 		projectileCombo.OnSelect = function(self, index, value, data)
 			if IsValid(cannon) then
 				surface.PlaySound("snds_jack_gmod/ez_gui/click_smol.ogg")
@@ -642,13 +653,13 @@ if CLIENT then
 				net.SendToServer()
 			end
 		end
-		
-		-- Autoloading toggle checkbox
-		local autoloadingCheckbox = vgui.Create("DCheckBoxLabel", controlPanel)
-		autoloadingCheckbox:SetPos(10, 120)
-		autoloadingCheckbox:SetSize(360, 25)
+
+		local autoloadingCheckbox = vgui.Create("DCheckBoxLabel", controlsPanel)
+		autoloadingCheckbox:Dock(TOP)
+		autoloadingCheckbox:SetTall(20)
+		autoloadingCheckbox:SetFont("JMod_EZCannon_Body")
 		autoloadingCheckbox:SetText("Enable Autoloading")
-		autoloadingCheckbox:SetTextColor(Color(255, 255, 255, 200))
+		autoloadingCheckbox:SetTextColor(bodyColor)
 		autoloadingCheckbox:SetChecked(cannon:GetIsAutoLoading() or false)
 		autoloadingCheckbox.OnChange = function(self, val)
 			if IsValid(cannon) then
@@ -661,19 +672,11 @@ if CLIENT then
 			end
 		end
 		
-		-- Button panel
-		local buttonPanel = vgui.Create("DPanel", frame)
-		buttonPanel:SetPos(10, 300)
-		buttonPanel:SetSize(380, 80)
-		
-		function buttonPanel:Paint(w, h)
-			surface.SetDrawColor(0, 0, 0, 100)
-			surface.DrawRect(0, 0, w, h)
-		end
-		
-		local fireButton = vgui.Create("DButton", buttonPanel)
-		fireButton:SetPos(10, 10)
-		fireButton:SetSize(175, 30)
+		local fireButton = vgui.Create("DButton", buttonRow)
+		fireButton:Dock(TOP)
+		fireButton:SetTall(30)
+		fireButton:DockMargin(0, 0, 0, 4)
+		fireButton:SetFont("JMod_EZCannon_Body")
 		fireButton:SetText("FIRE CANNON")
 		fireButton:SetTextColor(Color(255, 255, 255))
 		
@@ -709,9 +712,11 @@ if CLIENT then
 			end
 		end
 		
-		local unloadButton = vgui.Create("DButton", buttonPanel)
-		unloadButton:SetPos(195, 10)
-		unloadButton:SetSize(175, 30)
+		local unloadButton = vgui.Create("DButton", buttonRow)
+		unloadButton:Dock(TOP)
+		unloadButton:SetTall(30)
+		unloadButton:DockMargin(0, 0, 0, 4)
+		unloadButton:SetFont("JMod_EZCannon_Body")
 		unloadButton:SetText("UNLOAD")
 		unloadButton:SetTextColor(Color(255, 255, 255))
 		
@@ -738,74 +743,25 @@ if CLIENT then
 			end
 		end
 		
-		local closeButton = vgui.Create("DButton", buttonPanel)
-		closeButton:SetPos(10, 45)
-		closeButton:SetSize(360, 25)
-		closeButton:SetText("CLOSE")
-		closeButton:SetTextColor(Color(255, 255, 255))
 		
-		function closeButton:Paint(w, h)
-			local hovered = self:IsHovered()
-			local color = hovered and Color(80, 80, 80, 200) or Color(80, 80, 80, 150)
-			surface.SetDrawColor(color)
-			surface.DrawRect(0, 0, w, h)
-			
-			if hovered then
-				surface.SetDrawColor(255, 255, 255, 50)
-				surface.DrawRect(0, 0, w, h)
-			end
-		end
-		
-		closeButton.DoClick = function()
-			frame:Close()
-		end
-		
-		-- Update propellant when slider changes
+		-- Update propellant + muzzle velocity preview when slider changes
 		slider.OnValueChanged = function(self, value)
 			if IsValid(cannon) then
-				cannon.CurrentPropellantPerShot = math.floor(value)
+				local floored = math.floor(value)
+				cannon.CurrentPropellantPerShot = floored
 				net.Start("JMod_EZCannon_Command")
 				net.WriteEntity(cannon)
 				net.WriteUInt(JModBallistics.NETWORK_INDEX.CANNON_COMMAND.SETPROPLELLETPERSHOT, 4)
-				net.WriteUInt(math.floor(value), 8)
+				net.WriteUInt(floored, 8)
 				net.SendToServer()
-				
-				-- Update muzzle velocity display in real-time
-				local newMuzzleVelocity = 0
-				if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" and cannon.ProjectileMass and cannon.ProjectileMass > 0 then
-					local newForce = cannon:CalculateForceCurve(cannon:GetPowder())
-					newMuzzleVelocity = newForce / cannon.ProjectileMass
-				end
-				
-				local newVelocityText = "Muzzle Velocity:\n"
-				local newVelocityColor = Color(255, 255, 255, 200)
-				
-				if cannon.LoadedProjectileType and cannon.LoadedProjectileType ~= "" then
-					if newMuzzleVelocity > 0 then
-						-- Convert to more readable units (m/s)
-						local velocityMetersPerSec = math.Round(newMuzzleVelocity * 0.01905)
-						newVelocityText = newVelocityText .. velocityMetersPerSec .. " m/s\n"
-						newVelocityText = newVelocityText .. "(" .. math.Round(newMuzzleVelocity) .. " u/s)\n"
-						newVelocityText = newVelocityText .. "Mass: " .. cannon.ProjectileMass .. " kg"
-						
-						-- Color code based on velocity (higher velocity = greener)
-						local velocityQuality = math.Clamp(newMuzzleVelocity / 5000, 0, 1)
-						newVelocityColor = JMod.GoodBadColor(velocityQuality, 200)
-					else
-						newVelocityText = newVelocityText .. "No mass data\n"
-						newVelocityText = newVelocityText .. "Cannot calculate"
-						newVelocityColor = Color(255, 165, 0, 200)
-					end
-				else
-					newVelocityText = newVelocityText .. "No projectile\nloaded"
-					newVelocityColor = Color(150, 150, 150, 200)
-				end
-				
-				velocityLabel:SetText(newVelocityText)
-				velocityLabel:SetTextColor(newVelocityColor)
+
+				local velText, velCol = FormatVelText(floored)
+				muzzleLabel:SetText("Muzzle Vel: " .. velText)
+				muzzleLabel:SetTextColor(velCol)
 			end
 		end
-		
+		JMod_EZCannon_GUI = frame
+
 		-- Play menu open sound
 		surface.PlaySound("snds_jack_gmod/ez_gui/menu_open.ogg")
 	end

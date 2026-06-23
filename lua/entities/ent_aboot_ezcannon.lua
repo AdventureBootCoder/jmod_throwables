@@ -30,7 +30,7 @@ ENT.MaxPropellant = 100
 ENT.NextRefillTime = 0
 ENT.BarrelLength = 50
 ENT.BreachOffset = -20 -- Extra offset along barrel (Up) when seating a loaded projectile; launch alignment uses BarrelLength only
-ENT.MaxPropellantForce = 500000 * 3.3
+ENT.MaxPropellantForce = 1000000 * 3.3
 ENT.TargetPropellant = 50
 ENT.TargetPercentage = .5
 ENT.FireDelay = 1.5
@@ -339,6 +339,8 @@ if SERVER then
 			self.PropModel = Projectile:GetModel()
 		end
 
+		Projectile:ForcePlayerDrop()
+
 		local phys = Projectile:GetPhysicsObject()
 		local mass = 100
 		if IsValid(phys) then
@@ -346,8 +348,6 @@ if SERVER then
 			if mass > 20000 then
 				if Specs.DefaultMass then
 					mass = Specs.DefaultMass
-				else
-					mass = 100
 				end
 			end
 		else

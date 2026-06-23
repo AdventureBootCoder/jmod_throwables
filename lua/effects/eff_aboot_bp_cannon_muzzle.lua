@@ -5,17 +5,18 @@
 
 	if emitter then
 		for i = 1, 40 do
-			local ParticlePos = Pos - Dir * math.random(1, 10)
+			local InverseProgress = 1 - (i / 40)
+			local ParticlePos = Pos + Dir * math.random(-5, 5)
 			local particle = emitter:Add("mats_jack_gmod_sprites/flamelet" .. math.random(1, 5), ParticlePos)
-			particle:SetVelocity(Dir * 1000 * i * .25 * Scl + VectorRand() * math.random(1, 2) * Scl)
-			particle:SetAirResistance(50)
+			particle:SetVelocity(Dir * 1000 * i * .25 * Scl + VectorRand() * 500 * Scl)
+			particle:SetAirResistance(400)
 			particle:SetGravity(Vector(0, 0, math.random(5, 50)) + JMod.Wind * 100)
-			particle:SetDieTime(math.Rand(.5, .75))
+			particle:SetDieTime(i * 0.015)
 			particle:SetStartAlpha(255)
 			particle:SetEndAlpha(0)
-			local Size = (50 / i) * Scl
-			particle:SetStartSize(Size)
-			particle:SetEndSize(Size)
+			local Siz = i * 1 * Scl
+			particle:SetStartSize(Siz)
+			particle:SetEndSize(Siz * 2)
 			particle:SetRoll(math.Rand(-2, 2))
 			particle:SetRollDelta(math.Rand(-2, 2))
 			particle:SetColor(255, 255, 255)
@@ -23,9 +24,9 @@
 			particle:SetCollide(true)
 		end
 
-		local SmokeCount = 100
+		local SmokeCount = 50
 		for i = 1, SmokeCount do
-			local ParticlePos = Pos + Dir * math.random(-5, 15)
+			local ParticlePos = Pos + Dir * math.random(1, 15)
 			local particle = emitter:Add("particle/smokestack", ParticlePos)
 
 			local Progress = i / SmokeCount -- 0.0 to 1.0
@@ -35,20 +36,20 @@
 			
 			local DispersionMultiplier = Progress * 1
 			
-			local AirResistance = 200
+			local AirResistance = 100 * i
 			
-			local Lifetime = ProgressInverse * 5
+			local Lifetime = ProgressInverse * 3
 			
-			local BaseSize = (10 + ProgressInverse * 10)
+			local BaseSize = (10 + ProgressInverse * 10) * Scl
 			
 			particle:SetVelocity(Dir * BaseVelocity * VelocityMultiplier + VectorRand() * math.random(20, 40) * DispersionMultiplier)
 			particle:SetAirResistance(AirResistance)
-			particle:SetGravity(Vector(0, 0, math.random(5, 50)) + JMod.Wind * AirResistance * math.Rand(0.1, 1))
+			particle:SetGravity(Vector(0, 0, 50) + JMod.Wind * AirResistance)
 			particle:SetDieTime(Lifetime)
-			particle:SetStartAlpha(math.random(50, 100))
+			particle:SetStartAlpha(ProgressInverse * 80)
 			particle:SetEndAlpha(0)
 			particle:SetStartSize(BaseSize)
-			particle:SetEndSize(BaseSize * 20 * Scl)
+			particle:SetEndSize(BaseSize * 2)
 			particle:SetRoll(math.Rand(-2, 2))
 			particle:SetRollDelta(math.Rand(-2, 2))
 			local Col = math.random(180, 255)
@@ -60,16 +61,17 @@
 		for i = 1, SmokeCount * .5 do
 			local Progress = i / (SmokeCount * .5)
 			local ProgressInverse = 1 - Progress
+			local AirResistance = 500
 			local ParticlePos = Pos + Dir * math.random(1, 15)
 			local particle = emitter:Add("particle/smokestack", ParticlePos)
-			particle:SetVelocity(Dir * 1400 * Scl + VectorRand() * 1400 * Scl)
-			particle:SetAirResistance(200)
-			particle:SetGravity(Vector(0, 0, math.random(5, 50)) + JMod.Wind * math.Rand(100, 200))
-			particle:SetDieTime(math.Rand(1, 5))
-			particle:SetStartAlpha(math.random(50, 100))
+			particle:SetVelocity(Dir * 5000 * math.random(1, 2) * Scl + VectorRand() * 1200 * Scl)
+			particle:SetAirResistance(AirResistance)
+			particle:SetGravity(Vector(0, 0, 50) + JMod.Wind * AirResistance)
+			particle:SetDieTime(ProgressInverse * 4)
+			particle:SetStartAlpha(ProgressInverse * 80)
 			particle:SetEndAlpha(0)
 			particle:SetStartSize(math.Rand(10, 30))
-			particle:SetEndSize(350 * 2 * Scl)
+			particle:SetEndSize(600 * Scl)
 			particle:SetRoll(math.Rand(-2, 2))
 			particle:SetRollDelta(math.Rand(-2, 2))
 			local Col = math.random(180, 255)
